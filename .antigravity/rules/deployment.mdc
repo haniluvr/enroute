@@ -1,0 +1,27 @@
+# Deployment Guidelines
+
+Enroute consists of three distinct platforms, requiring three deployment strategies.
+
+## 1. Mobile App (React Native Expo)
+- **Tool**: Expo Application Services (EAS).
+- **Process**:
+  - Run `eas build -p android --profile preview` to generate APKs for testing.
+  - Run `eas build -p ios` (requires Apple Developer account) for TestFlight.
+- **Over-the-Air Updates**: Use EAS Update for pushing bug fixes without App Store review.
+
+## 2. Admin Web App (React Vite)
+- **Tool**: Vercel or Firebase Hosting.
+- **Process (Firebase)**:
+  - `npm run build`
+  - `firebase deploy --only hosting:admin` (assumes multi-site config).
+  - Preferred because it aligns with our Firebase Auth/DB logic.
+
+## 3. Backend Microservice (Node.js/Express)
+- **Tool**: Render, Railway, or Firebase Cloud Functions.
+- **Recommendation for MVP**: Deploy as a standard Node app to **Render.com** (Free/Hobby tier).
+- **Process**:
+  - Requires setting environment variables heavily (Firebase Admin credentials, OpenAI keys).
+  - Start command: `node server.js`
+  - Port must be bound dynamically using `process.env.PORT`.
+
+> **Note**: For local development, all three can run simultaneously. Set up npm scripts in the root of the project to boot them easily.

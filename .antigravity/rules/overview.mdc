@@ -1,0 +1,31 @@
+# Enroute: Project Overview
+
+## Vision
+To create a unified, intuitive career navigation platform that eliminates information fragmentation and empowers users—regardless of their life stage—to discover, plan, and execute their career journeys with confidence. 
+
+## Mission
+To provide a personalized, conversational, and visually elegant experience where users can explore careers, build skills, and receive AI-powered guidance through Dahlia, all within a single, trusted space.
+
+## Core Identity
+- **App Name**: Enroute  
+- **AI Name**: Dahlia  
+- **Meaning**: *Dahlia* symbolizes inner strength, creativity, elegance, and lasting commitment—the qualities the app helps users cultivate.
+
+## Target Audience & Platforms
+1. **High School Students**: Preparing for Post-Baccalaureate Orientation, facing uncertainty due to scattered information. (Mobile App)
+2. **University Students & Regular Individuals**: Questioning their academic path, seeking structured guidance. (Mobile App)
+3. **Career Starters, Switchers & Upskillers**: Navigating transitions, identifying transferable skills, building new competencies. (Mobile App)
+4. **Career Counselors, Mentors & Admins**: Tracking outcomes, providing guidance, and managing institutional analytics. (Web App Portal)
+
+## Key Differentiators & Philosophy
+- **Conversational First**: Voice + text interaction with Dahlia makes exploration natural and supportive.
+- **Personalized Pathways**: End-to-end career roadmaps built from user inputs (goals, skills, interests via Personalized Career Tests).
+- **Unified Experience**: Integrates career testing, CV analysis, resource discovery, mentorship, and tracking in one app.
+- **Vibe-Coding Mindset**: Emphasize speed, a stunning visual experience (sleek dark-mode interface with vibrant accents), and highly empathetic AI interactions.
+
+## Non-Functional Requirements
+- **Cross-Platform**: React Native Expo targeting both iOS and Android simultaneously.
+- **Speed & Rapid Development**: The stack (Firebase + Node/Express) is optimized for shipping quickly.
+- **Documentation First**: Every development session MUST result in updates to the root `README.md` and `documentation.md`.
+
+> **Note**: This overview is the single source of truth. All structural and architectural code generated must align with the vision of Enroute (Mobile) and the accompanying Admin Portal.

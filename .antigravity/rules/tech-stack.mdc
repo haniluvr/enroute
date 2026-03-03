@@ -1,0 +1,47 @@
+# Enroute Tech Stack Specification
+
+## Core Stack Architecture (Hybrid Rapid-Dev Setup)
+
+To ensure rapid iteration while maintaining the power of custom AI integrations, we are using a hybrid backend approach. 
+
+| Layer | Technology | Responsibility / Why Chosen |
+|-------|------------|-----------------------------|
+| **Mobile Frontend** | React Native (Expo) | Cross-platform (iOS/Android), rapid iteration, UI consistency. |
+| **Admin Web Frontend** | React.js (Vite) | Fast, dashboard-oriented web app for Mentors and Counselors. |
+| **Primary Database & Auth** | Firebase (Auth, Firestore, Storage) | Handles user authentication, real-time sync, offline support, and file/CV storage. Allows the mobile app to be built rapidly without writing basic CRUD endpoints. |
+| **Backend Microservice** | Node.js + Express | Handles heavy lifting: Dahlia AI interaction logic, CV parsing, web scraping (if necessary), scheduled jobs, and complex matching algorithms. Interacts securely with Firestore via the `firebase-admin` SDK. |
+| **Styling** | Tailwind CSS / NativeWind | Dark-mode native, rapid UI prototyping, shared design language between Mobile and Web. |
+
+*(Note: We deliberately exclude n8n for the MVP to reduce infrastructure overhead. All automation and heavy logic lives in Node.js).*
+
+## Versioning & Dependencies
+- **Mobile**: React Native (latest compatible with Expo SDK 50+).
+- **Web**: React 18, Vite.
+- **Backend**: Node >= 18.x, Express 4.x.
+- **Database**: Firebase SDK v10+.
+
+## Infrastructure & Data Flow
+
+```text
+[ Mobile App (Expo) ]         [ Admin Web App (Vite) ]
+       \                              /
+        \                            /
+      (Direct DB Reads & Standard CRUD)
+          \                        /
+           v                      v
+        [ Firebase (Firestore / Auth) ]
+                   ^
+                   | (Admin SDK bypasses security rules)
+                   v
+       [ Node.js / Express Backend API ]
+             /                     \
+            /                       \
+   [ External AI APIs ]     [ Scraping / Jobs / Analytics Gen ]
+```
+
+## Integration Principles
+1. **Frontend to Firebase**: The Expo app and Vite app should directly read/write simple data to Firestore (e.g., getting the user profile, reading announcements). This is the fastest way to build.
+2. **Frontend to Express**: For operations that require hidden API keys (e.g., calling OpenAI for Dahlia, processing CV PDFs), the frontend sends a secure HTTP request (with Firebase Auth token) to the Express backend.
+3. **Express to Firebase**: The Express backend processes the AI task and writes the result back into Firestore via the Admin SDK, which the mobile app immediately sees via real-time listeners.
+
+> **Crucial Rule**: Do NOT build a traditional REST API for every single resource. Leverage Firebase for standard CRUD, and use Express strictly for intensive/secure tasks.

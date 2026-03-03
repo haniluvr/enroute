@@ -1,0 +1,48 @@
+# Enroute Product Requirements Document (PRD)
+
+## 1. Introduction
+This PRD defines the functional and non-functional requirements for Enroute, an AI-powered career navigation platform, and its accompanying Admin/Mentor Web Portal. It serves as the master guide for feature development.
+
+## 2. Goals & Objectives
+- **Primary Goal**: Reduce career decision paralysis by providing a unified, personalized journey planner and AI mentorship.
+- **Secondary Goal**: Provide Career Counselors and Mentors a dashboard to track, guide, and analyze student/user progress efficiently.
+
+## 3. User Stories
+
+### As a Student / App User, I want to...
+- Take a Personalized Career Test to discover potential paths and institutions.
+- Interact with Dahlia (AI) via Voice or Text to ask career questions and record voice ideas.
+- Scan my existing CV to identify skill gaps and generate improvements.
+- Receive a tailored step-by-step roadmap for my desired role (e.g., "Software Engineer") with estimated timelines, required diplomas, and salary data.
+- Search for specific Universities, Institutions, or Mentors using smart AI search and filters.
+- Connect with human Mentors listed in the service directory for direct guidance.
+- Receive announcements for events, forums, competitions, and scholarships, along with deadline notifications.
+
+### As a Career Counselor / Mentor (Web Portal Admin), I want to...
+- View anonymized analytics on student skill gaps, roadmap completions, and engagement.
+- Manage my Mentor Profile so students can find my services.
+- Post announcements (events, scholarships) directly to the mobile app.
+- Monitor the success rate of career placements to adjust institutional guidance.
+
+## 4. Functional Requirements
+
+| Category | Feature | Description | Priority |
+|----------|---------|-------------|----------|
+| **Core AI** | Dahlia Interaction | Real-time voice/text chat, recording, transcription, AI guidance | P0 |
+| **Discovery**| Personalized Career Test | Gamified onboarding/testing yielding tailored field/university recs | P0 |
+| **Planning** | Career Roadmaps | AI-generated step-by-step learning paths + CV Analysis | P0 |
+| **Search** | Smart DB Search | Searchable directories for Institutions, Careers, and Mentors | P1 |
+| **Network** | Mentor System | Directory of mentors with profiles, allowing users to connect | P1 |
+| **Updates** | Announcements | Feed for events, scholarships, and deadline push notifications | P2 |
+| **Admin** | Web Dashboard | React web app for analytics, mentor management, announcement posting | P1 |
+
+## 5. Non-Functional Requirements
+- **Performance**: Mobile app must load swiftly; voice interactions require < 3s latency.
+- **UX/UI**: Sleek dark-mode interface with vibrant accents. The design MUST feel premium, modern, and engaging.
+- **Data Governance**: Secure handling of CVs, voice data, and personal profiles via rigorous Firebase Auth & security rules.
+
+## 6. Out of Scope (MVP)
+- Deep video conferencing integration within the app (mentor contacts will use external links initially).
+- Complex payment gateways.
+
+> **Note**: This PRD must be referenced when evaluating feature completeness during vibe-coding sessions.
