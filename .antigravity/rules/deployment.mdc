@@ -24,4 +24,7 @@ Enroute consists of three distinct platforms, requiring three deployment strateg
   - Start command: `node server.js`
   - Port must be bound dynamically using `process.env.PORT`.
 
-> **Note**: For local development, all three can run simultaneously. Set up npm scripts in the root of the project to boot them easily.
+## 4. Environment Variables & Link Helper
+**CRITICAL RULE: NO HARDCODED LINKS.**
+- You must create and use an "Environment Link Helper" (e.g., `src/config/env.js`) that dynamically resolves API endpoints, web URLs, and deep links based on the current environment (`development` vs `production`).
+- Never hardcode `http://localhost:3000` or production database URLs inside components. All apps must fetch these from environment configs.

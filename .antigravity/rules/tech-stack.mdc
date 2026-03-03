@@ -40,8 +40,12 @@ To ensure rapid iteration while maintaining the power of custom AI integrations,
 ```
 
 ## Integration Principles
-1. **Frontend to Firebase**: The Expo app and Vite app should directly read/write simple data to Firestore (e.g., getting the user profile, reading announcements). This is the fastest way to build.
-2. **Frontend to Express**: For operations that require hidden API keys (e.g., calling OpenAI for Dahlia, processing CV PDFs), the frontend sends a secure HTTP request (with Firebase Auth token) to the Express backend.
-3. **Express to Firebase**: The Express backend processes the AI task and writes the result back into Firestore via the Admin SDK, which the mobile app immediately sees via real-time listeners.
+1. **Frontend to Firebase**: The Expo app and Vite app should directly read/write simple data to Firestore.
+2. **Frontend to Express**: For heavy operations (Dahlia), the frontend sends a secure HTTP request.
+3. **Custom Dahlia AI Pipeline**:
+   - **Data Layer**: Firestore holds user profile context.
+   - **Knowledge Base (RAG)**: A dedicated vector database (e.g., Pinecone or Firebase Vector Search) holding scraped Philippine career data, university details, and TESDA credentials.
+   - **Generative Engine**: A distinct AI microservice (Python + FastAPI) or integrated directly into Node.js (via LangChain), which queries a fine-tuned model (e.g., OpenAI customized specifically for empathy) combined with the internal RAG data. This ensures "Dahlia" acts exclusively as a career mentor.
+4. **Express to Firebase**: The Express backend processes the AI task and writes the result back into Firestore via the Admin SDK.
 
 > **Crucial Rule**: Do NOT build a traditional REST API for every single resource. Leverage Firebase for standard CRUD, and use Express strictly for intensive/secure tasks.

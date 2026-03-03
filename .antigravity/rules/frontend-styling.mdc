@@ -20,6 +20,7 @@ Vibe-coding requires the app to feel "alive."
 - **Micro-interactions**: Subtle scale-down (`scale-95`) on button presses.
 - **Page Transitions**: Smooth slide or fade transitions (using React Navigation's native stack defaults or Reanimated/Framer Motion).
 - **"Career Swipe" Cards**: Needs to feel fluid and satisfying, similar to consumer apps. Fluid spring animations.
+- **Navigation/Tab Bar**: MUST implement the latest iOS design update: the "Liquid Glass Tab Bar". The tab bar should feel transparent, blurred, glowing, and fluidly animated when changing tabs. Applies to iOS prominently, with a graceful fallback or similar design on Android.
 
 ## UI Component Rules
 - **Buttons**: Fully rounded (pill shape) or soft corners (`rounded-2xl`). Must have clear active/hover states (if applicable). Use gradients on primary CTAs.

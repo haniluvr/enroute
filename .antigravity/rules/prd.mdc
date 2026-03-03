@@ -29,6 +29,7 @@ This PRD defines the functional and non-functional requirements for Enroute, an 
 | Category | Feature | Description | Priority |
 |----------|---------|-------------|----------|
 | **Core AI** | Dahlia Interaction | Real-time voice/text chat, recording, transcription, AI guidance | P0 |
+| **Model** | Custom Dahlia AI | Dedicated fine-tuned LLM or RAG pipeline specifically trained on Philippine career paths and empathetic counseling | P0 |
 | **Discovery**| Personalized Career Test | Gamified onboarding/testing yielding tailored field/university recs | P0 |
 | **Planning** | Career Roadmaps | AI-generated step-by-step learning paths + CV Analysis | P0 |
 | **Search** | Smart DB Search | Searchable directories for Institutions, Careers, and Mentors | P1 |

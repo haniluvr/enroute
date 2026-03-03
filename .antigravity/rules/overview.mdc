@@ -11,11 +11,10 @@ To provide a personalized, conversational, and visually elegant experience where
 - **AI Name**: Dahlia  
 - **Meaning**: *Dahlia* symbolizes inner strength, creativity, elegance, and lasting commitment—the qualities the app helps users cultivate.
 
-## Target Audience & Platforms
-1. **High School Students**: Preparing for Post-Baccalaureate Orientation, facing uncertainty due to scattered information. (Mobile App)
-2. **University Students & Regular Individuals**: Questioning their academic path, seeking structured guidance. (Mobile App)
-3. **Career Starters, Switchers & Upskillers**: Navigating transitions, identifying transferable skills, building new competencies. (Mobile App)
-4. **Career Counselors, Mentors & Admins**: Tracking outcomes, providing guidance, and managing institutional analytics. (Web App Portal)
+## Project Outputs (Three Clients)
+1. **Mobile App**: Cross-platform (iOS & Android) application for High School Students, University Students, Career Switchers, and Upskillers to take tests, interact with Dahlia, and navigate their roadmaps.
+2. **Web App**: A modern landing page to describe the product and redirect interested users to download the mobile application. (Does NOT contain the full app logic).
+3. **Admin Web App**: A dedicated web portal for Career Counselors, Mentors, and IT personnel to track outcomes, provide guidance, and manage institutional analytics.
 
 ## Key Differentiators & Philosophy
 - **Conversational First**: Voice + text interaction with Dahlia makes exploration natural and supportive.

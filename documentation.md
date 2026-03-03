@@ -10,6 +10,9 @@
 - Finalized Hybrid Architecture: React Native Expo (Mobile), React Vite (Admin), Node.js/Express (Heavy Backend API), and Firebase (Auth, Storage, Real-time DB).
 - Established `documentation.md` tracker to fulfill custom user requirements.
 - Standardized UI/UX rules (dark mode, neon vibrant colors) in `frontend-styling.mdc`.
+- **Scaffolded full monorepo**: Initialized `apps/mobile`, `apps/web`, `apps/admin-web`, and `apps/backend`.
+- **Injected Tailwind**: Configured `tailwind.config.js` and `postcss.config.js` on Vite react apps along with base directives to prep for vibe coding.
+- **Backend Setup**: Initialized basic Express server with TS config.
 
 ### Removed
 - Deprecated n8n automation concept from original SAD documentation to favor rapid Node.js Express workflows.
