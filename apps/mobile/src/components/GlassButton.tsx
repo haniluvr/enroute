@@ -1,4 +1,5 @@
 import { TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import tw from '@/lib/tailwind';
 
 interface GlassButtonProps {
     title: string;
@@ -6,6 +7,7 @@ interface GlassButtonProps {
     isLoading?: boolean;
     variant?: 'primary' | 'secondary' | 'danger';
     fullWidth?: boolean;
+    style?: any;
 }
 
 export function GlassButton({
@@ -13,7 +15,8 @@ export function GlassButton({
     onPress,
     isLoading = false,
     variant = 'primary',
-    fullWidth = true
+    fullWidth = true,
+    style
 }: GlassButtonProps) {
 
     const getVariantStyles = () => {
@@ -32,17 +35,15 @@ export function GlassButton({
             onPress={onPress}
             disabled={isLoading}
             activeOpacity={0.7}
-            className={`
-        ${fullWidth ? 'w-full' : 'self-start'} 
-        rounded-2xl py-4 px-6 border backdrop-blur-md 
-        items-center justify-center flex-row shadow-lg
-        ${getVariantStyles()}
-      `}
+            style={[
+                tw`${fullWidth ? 'w-full' : 'self-start'} rounded-2xl py-4 px-6 border backdrop-blur-md items-center justify-center flex-row shadow-lg ${getVariantStyles()}`,
+                style
+            ]}
         >
             {isLoading ? (
                 <ActivityIndicator color="#fff" />
             ) : (
-                <Text className="text-white text-lg font-inter-semibold">
+                <Text style={tw`text-white text-lg font-inter-semibold`}>
                     {title}
                 </Text>
             )}

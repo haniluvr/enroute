@@ -1,83 +1,90 @@
+import tw from '@/lib/tailwind';
 import { View, Text, ScrollView } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassButton } from '@/components/GlassButton';
 import { useAuth } from '@/hooks/useAuth';
 import { Bell, MapPin, Sparkles } from 'lucide-react-native';
-import { mockJobs } from '@/config/dummyData';
 import { Link } from 'expo-router';
 
+// Dummy data for visual execution
+const mockJobs = [
+    { id: '1', title: 'Frontend Developer Intern', company: 'TechNova', matchScore: 94, salary: '$24/hr', distance: '10 miles', skills: ['React', 'TypeScript'] },
+    { id: '2', title: 'UI/UX Design Intern', company: 'CreativePulse', matchScore: 88, salary: '$20/hr', distance: 'Remote', skills: ['Figma', 'Prototyping'] }
+];
+
 export default function HomeScreen() {
-    const { user } = useAuth();
-    // Using dummy name for now since auth state is a placeholder
-    const displayName = "Isabella";
+    const { user, isCounselor } = useAuth();
+
+    // Fallback names for now since Firebase isn't live
+    const displayName = user?.displayName || 'Isabella';
 
     return (
         <GlassBackground>
-            <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
-
-                {/* Header Section */}
-                <View className="px-6 pt-16 pb-6 flex-row justify-between items-center">
+            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+                {/* Header */}
+                <View style={tw`px-6 pt-16 pb-6 flex-row justify-between items-center`}>
                     <View>
-                        <Text className="text-gray-400 font-inter-medium text-sm">Welcome back,</Text>
-                        <Text className="text-white font-inter-bold text-3xl">{displayName}</Text>
+                        <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm`}>Welcome back,</Text>
+                        <Text style={tw`text-white font-[InterTight-Bold] text-3xl`}>{displayName}</Text>
                     </View>
-                    <View className="bg-white/10 p-3 rounded-full border border-white/20">
+                    <View style={tw`bg-white/10 p-3 rounded-full border border-white/20`}>
                         <Bell color="#fff" size={24} />
                     </View>
                 </View>
 
-                {/* Dahlia Mentor Quick Action */}
-                <View className="px-6 mb-8">
-                    <GlassCard style={{ borderColor: 'rgba(255, 0, 127, 0.4)' }}>
-                        <View className="flex-row items-center mb-4">
-                            <View className="bg-accent-pink/20 p-2 rounded-full mr-3">
-                                <Sparkles color="#ff007f" size={22} />
+                {/* Dahlia AI Quick Launch */}
+                <View style={tw`px-6 mb-8`}>
+                    <GlassCard intensity={80}>
+                        <View style={tw`flex-row items-center mb-4`}>
+                            <View style={tw`bg-accent-pink/20 p-2 rounded-full mr-3`}>
+                                <Sparkles color="#ff007f" size={24} />
                             </View>
-                            <Text className="text-white font-inter-bold text-xl">Ask Dahlia</Text>
+                            <Text style={tw`text-white font-[InterTight-Bold] text-xl`}>Ask Dahlia</Text>
                         </View>
-                        <Text className="text-gray-300 font-inter mb-4 leading-5">
-                            I noticed you completed an AWS networking course yesterday. Should we look for Cloud roles to match?
+                        <Text style={tw`text-gray-300 font-[InterTight-Regular] mb-4 leading-5`}>
+                            Your AI mentor is ready. Review your latest mock-interview feedback or ask about the TechNova internship.
                         </Text>
-                        <Link href="/(tabs)/discover" asChild>
-                            <GlassButton title="Start Voice Chat" onPress={() => { }} fullWidth={false} />
-                        </Link>
+                        <GlassButton
+                            title="Chat with Dahlia"
+                            onPress={() => console.log('Launch Dahlia')}
+                            variant="primary"
+                        />
                     </GlassCard>
                 </View>
 
-                {/* Current Job Matches Preview */}
-                <View className="px-6 mb-6">
-                    <Text className="text-white font-inter-semibold text-lg mb-4">Top Matches Today</Text>
+                {/* Top Matches Feed */}
+                <View style={tw`px-6 mb-6`}>
+                    <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-4`}>Top Matches Today</Text>
 
-                    {mockJobs.slice(0, 2).map((job) => (
-                        <GlassCard key={job.id} className="mb-4">
-                            <View className="flex-row justify-between items-start mb-2">
-                                <Text className="text-white font-inter-bold text-lg flex-1 mr-2">{job.title}</Text>
-                                <View className="bg-accent-emerald/20 px-2 py-1 rounded-md">
-                                    <Text className="text-accent-emerald font-inter-bold text-xs">{job.matchScore}% Match</Text>
+                    {mockJobs.map((job) => (
+                        <GlassCard key={job.id} style={tw`mb-4`}>
+                            <View style={tw`flex-row justify-between items-start mb-2`}>
+                                <Text style={tw`text-white font-[InterTight-Bold] text-lg flex-1 mr-2`}>{job.title}</Text>
+                                <View style={tw`bg-accent-emerald/20 px-2 py-1 rounded-md`}>
+                                    <Text style={tw`text-accent-emerald font-[InterTight-Bold] text-xs`}>{job.matchScore}% Match</Text>
                                 </View>
                             </View>
 
-                            <Text className="text-accent-cyan font-inter-medium text-sm mb-3">{job.company}</Text>
+                            <Text style={tw`text-accent-cyan font-[InterTight-Medium] text-sm mb-3`}>{job.company}</Text>
 
-                            <View className="flex-row items-center mb-4">
-                                <MapPin color="#aaa" size={14} className="mr-1" />
-                                <Text className="text-gray-400 font-inter text-sm">{job.distance} away</Text>
-                                <Text className="text-gray-500 mx-2">•</Text>
-                                <Text className="text-white font-inter-semibold text-sm">{job.salary}</Text>
+                            <View style={tw`flex-row items-center mb-4`}>
+                                <MapPin color="#aaa" size={14} style={tw`mr-1`} />
+                                <Text style={tw`text-gray-400 font-[InterTight-Regular] text-sm`}>{job.distance} away</Text>
+                                <Text style={tw`text-gray-500 mx-2`}>•</Text>
+                                <Text style={tw`text-white font-[InterTight-SemiBold] text-sm`}>{job.salary}</Text>
                             </View>
 
-                            <View className="flex-row flex-wrap">
+                            <View style={tw`flex-row flex-wrap`}>
                                 {job.skills.map((skill, idx) => (
-                                    <View key={idx} className="bg-white/10 px-3 py-1 rounded-full mr-2 mb-2">
-                                        <Text className="text-gray-300 text-xs font-inter">{skill}</Text>
+                                    <View key={idx} style={tw`bg-white/10 px-3 py-1 rounded-full mr-2 mb-2`}>
+                                        <Text style={tw`text-gray-300 text-xs font-[InterTight-Regular]`}>{skill}</Text>
                                     </View>
                                 ))}
                             </View>
                         </GlassCard>
                     ))}
                 </View>
-
             </ScrollView>
         </GlassBackground>
     );

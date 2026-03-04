@@ -1,92 +1,136 @@
-import { View, Text, TextInput, Alert, ScrollView } from 'react-native';
+import tw from '@/lib/tailwind';
+import { View, Text, TextInput, Alert, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassButton } from '@/components/GlassButton';
 import { useState } from 'react';
 import { Link, router } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 
-export default function SignUp() {
+export default function SignUpScreen() {
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleRegister = async () => {
-        if (!email || !password || !name) {
-            Alert.alert('Error', 'Please fill out all fields');
+    const handleSignUp = () => {
+        if (!email || !password || !firstName || !lastName || !phone || !confirmPassword) {
+            Alert.alert('Error', 'Please enter all fields');
             return;
         }
-
-        setLoading(true);
-        // Simulate register network request
+        if (password !== confirmPassword) {
+            Alert.alert('Error', 'Passwords do not match');
+            return;
+        }
+        setIsLoading(true);
         setTimeout(() => {
-            setLoading(false);
-            // We will replace this with actual firebase logic later
-            router.replace('/(tabs)/home');
+            setIsLoading(false);
+            router.push('/(auth)/persona');
         }, 1500);
     };
 
     return (
         <GlassBackground>
-            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} className="px-6 py-10">
-                <View className="items-center mb-8">
-                    <Text className="text-4xl text-white font-inter-bold mb-2">Join Enroute</Text>
-                    <Text className="text-gray-300 text-base font-inter-medium text-center">
-                        Your personalized career roadmap starts here.
-                    </Text>
+            <SafeAreaView style={tw`flex-1`}>
+                {/* Back Button */}
+                <View style={tw`px-4 pt-4`}>
+                    <TouchableOpacity onPress={() => router.back()} style={tw`bg-white/10 p-2 rounded-full self-start`}>
+                        <ChevronLeft color="#fff" size={24} />
+                    </TouchableOpacity>
                 </View>
 
-                <GlassCard>
-                    <Text className="text-white text-2xl font-inter-semibold mb-6">Create Profile</Text>
+                <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }} style={tw`px-6 pt-4`}>
 
-                    <View className="space-y-4">
-                        <View className="mb-4">
-                            <Text className="text-gray-400 mb-2 font-inter ml-1">Full Name</Text>
+                    <View style={tw`mb-8`}>
+                        <Text style={tw`text-3xl text-white font-[InterTight-Bold] mb-2`}>Create an account 👋</Text>
+                        <Text style={tw`text-gray-400 font-[InterTight-Regular]`}>
+                            Please fill in your details to log you back into your enroute account
+                        </Text>
+                    </View>
+
+                    <GlassCard style={tw`p-2 mb-6 border-white/10`}>
+                        <View style={tw`mb-4`}>
+                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>First Name</Text>
                             <TextInput
-                                className="bg-white/5 border border-white/10 rounded-xl p-4 text-white font-inter"
-                                placeholder="Juan Dela Cruz"
-                                placeholderTextColor="rgba(255,255,255,0.4)"
-                                value={name}
-                                onChangeText={setName}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                placeholder="John"
+                                placeholderTextColor="#555"
+                                value={firstName}
+                                onChangeText={setFirstName}
                             />
                         </View>
 
-                        <View className="mb-4">
-                            <Text className="text-gray-400 mb-2 font-inter ml-1">Student Email</Text>
+                        <View style={tw`mb-4`}>
+                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Last Name</Text>
                             <TextInput
-                                className="bg-white/5 border border-white/10 rounded-xl p-4 text-white font-inter"
-                                placeholder="juan@university.edu.ph"
-                                placeholderTextColor="rgba(255,255,255,0.4)"
-                                value={email}
-                                onChangeText={setEmail}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                placeholder="Doe"
+                                placeholderTextColor="#555"
+                                value={lastName}
+                                onChangeText={setLastName}
+                            />
+                        </View>
+
+                        <View style={tw`mb-4`}>
+                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Email</Text>
+                            <TextInput
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                placeholder="student@university.edu"
+                                placeholderTextColor="#555"
                                 autoCapitalize="none"
                                 keyboardType="email-address"
+                                value={email}
+                                onChangeText={setEmail}
                             />
                         </View>
 
-                        <View className="mb-8">
-                            <Text className="text-gray-400 mb-2 font-inter ml-1">Password</Text>
+                        <View style={tw`mb-4`}>
+                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Phone number</Text>
                             <TextInput
-                                className="bg-white/5 border border-white/10 rounded-xl p-4 text-white font-inter"
-                                placeholder="••••••••"
-                                placeholderTextColor="rgba(255,255,255,0.4)"
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                placeholder="+1 234 567 8900"
+                                placeholderTextColor="#555"
+                                keyboardType="phone-pad"
+                                value={phone}
+                                onChangeText={setPhone}
+                            />
+                        </View>
+
+                        <View style={tw`mb-4`}>
+                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Password</Text>
+                            <TextInput
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                placeholder="Enter password"
+                                placeholderTextColor="#555"
                                 secureTextEntry
                                 value={password}
                                 onChangeText={setPassword}
                             />
                         </View>
 
-                        <GlassButton title="Register" onPress={handleRegister} isLoading={loading} />
-
-                        <View className="flex-row justify-center mt-6">
-                            <Text className="text-gray-400 font-inter">Already have an account? </Text>
-                            <Link href="/(auth)/sign-in">
-                                <Text className="text-accent-violet font-inter-semibold">Sign In</Text>
-                            </Link>
+                        <View style={tw`mb-6`}>
+                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Confirm password</Text>
+                            <TextInput
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                placeholder="Enter password"
+                                placeholderTextColor="#555"
+                                secureTextEntry
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                            />
                         </View>
-                    </View>
-                </GlassCard>
-            </ScrollView>
+
+                        <GlassButton
+                            title="Get started"
+                            onPress={handleSignUp}
+                            isLoading={isLoading}
+                        />
+                    </GlassCard>
+                </ScrollView>
+            </SafeAreaView>
         </GlassBackground>
     );
 }

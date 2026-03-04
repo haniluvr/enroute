@@ -11,8 +11,6 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
-import "../../global.css"; // Import NativeWind global styles
-
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
 
@@ -30,6 +28,10 @@ export default function RootLayout() {
         }
     }, [fontsLoaded, fontError]);
 
+    if (fontError) {
+        console.error("Font Loading Error:", fontError);
+    }
+
     if (!fontsLoaded && !fontError) {
         return null; // Wait for fonts to load
     }
@@ -40,7 +42,7 @@ export default function RootLayout() {
             <Stack
                 screenOptions={{
                     headerShown: false, // We'll build custom Glass Headers
-                    contentStyle: { backgroundColor: '#0A0A1A' } // Deep Dark Background
+                    contentStyle: { backgroundColor: 'transparent' }
                 }}
             >
                 <Stack.Screen name="index" />

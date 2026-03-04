@@ -21,13 +21,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         // Placeholder for actual firebase auth listener
-        // This allows us to work on the UI without a live project yet.
-        const mockAuthWait = setTimeout(() => {
-            setUser(null); // Set to true to test logged in state
-            setIsLoading(false);
-        }, 1000);
-
-        return () => clearTimeout(mockAuthWait);
+        // Instantly bypass loading state for UI testing
+        setUser(null);
+        setIsLoading(false);
     }, []);
 
     return (
