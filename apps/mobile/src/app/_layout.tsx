@@ -10,6 +10,7 @@ import {
 } from '@expo-google-fonts/inter-tight';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -37,18 +38,20 @@ export default function RootLayout() {
     }
 
     return (
-        <AuthProvider>
-            <StatusBar style="light" />
-            <Stack
-                screenOptions={{
-                    headerShown: false, // We'll build custom Glass Headers
-                    contentStyle: { backgroundColor: 'transparent' }
-                }}
-            >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            </Stack>
-        </AuthProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <AuthProvider>
+                <StatusBar style="light" />
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: 'transparent' }
+                    }}
+                >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                </Stack>
+            </AuthProvider>
+        </GestureHandlerRootView>
     );
 }

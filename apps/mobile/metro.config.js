@@ -5,4 +5,7 @@ const { getDefaultConfig } = require("expo/metro-config");
 // manually be compiled via Tailwind CLI or we must downgrade to NativeWind v2.
 const config = getDefaultConfig(__dirname);
 
+// Add webm to the list of assets that the bundler will bundle
+config.resolver.assetExts.push('webm');
+
 module.exports = config;

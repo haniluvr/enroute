@@ -46,16 +46,16 @@ export default function SignUpScreen() {
 
                     <View style={tw`mb-8`}>
                         <Text style={tw`text-3xl text-white font-[InterTight-Bold] mb-2`}>Create an account 👋</Text>
-                        <Text style={tw`text-gray-400 font-[InterTight-Regular]`}>
+                        <Text style={tw`text-gray-400 font-[InterTight]`}>
                             Please fill in your details to log you back into your enroute account
                         </Text>
                     </View>
 
                     <GlassCard style={tw`p-2 mb-6 border-white/10`}>
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>First Name</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>First Name</Text>
                             <TextInput
-                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight]`}
                                 placeholder="John"
                                 placeholderTextColor="#555"
                                 value={firstName}
@@ -64,9 +64,9 @@ export default function SignUpScreen() {
                         </View>
 
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Last Name</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Last Name</Text>
                             <TextInput
-                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight]`}
                                 placeholder="Doe"
                                 placeholderTextColor="#555"
                                 value={lastName}
@@ -75,9 +75,9 @@ export default function SignUpScreen() {
                         </View>
 
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Email</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Email</Text>
                             <TextInput
-                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight]`}
                                 placeholder="student@university.edu"
                                 placeholderTextColor="#555"
                                 autoCapitalize="none"
@@ -88,9 +88,9 @@ export default function SignUpScreen() {
                         </View>
 
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Phone number</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Phone number</Text>
                             <TextInput
-                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight]`}
                                 placeholder="+1 234 567 8900"
                                 placeholderTextColor="#555"
                                 keyboardType="phone-pad"
@@ -100,9 +100,9 @@ export default function SignUpScreen() {
                         </View>
 
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Password</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Password</Text>
                             <TextInput
-                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight]`}
                                 placeholder="Enter password"
                                 placeholderTextColor="#555"
                                 secureTextEntry
@@ -112,9 +112,9 @@ export default function SignUpScreen() {
                         </View>
 
                         <View style={tw`mb-6`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Confirm password</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Confirm password</Text>
                             <TextInput
-                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight]`}
                                 placeholder="Enter password"
                                 placeholderTextColor="#555"
                                 secureTextEntry

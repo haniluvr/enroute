@@ -14,7 +14,7 @@ export default function ProfileScreen() {
                 </View>
 
                 <Text style={tw`text-3xl text-white font-[InterTight-Bold] mb-2`}>Isabella S.</Text>
-                <Text style={tw`text-accent-cyan font-[InterTight-Medium] mb-10`}>BS Information Technology, Year 3</Text>
+                <Text style={tw`text-accent-cyan font-[InterTight] font-medium mb-10`}>BS Information Technology, Year 3</Text>
 
                 <GlassButton
                     title="Sign Out"

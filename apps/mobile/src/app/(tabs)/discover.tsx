@@ -15,7 +15,7 @@ export default function DiscoverScreen() {
 
                     <GlassCard style={tw`w-full h-80 items-center justify-center border-accent-cyan/30`}>
                         <Sparkles color="#00e5ff" size={48} style={tw`mb-4`} />
-                        <Text style={tw`text-gray-300 text-center font-[InterTight-Medium] px-6`}>
+                        <Text style={tw`text-gray-300 text-center font-[InterTight] font-medium px-6`}>
                             AI is generating new opportunities for you based on your major and skills. Swipe right to apply.
                         </Text>
                     </GlassCard>

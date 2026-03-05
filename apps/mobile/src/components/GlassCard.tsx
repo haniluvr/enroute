@@ -3,17 +3,20 @@ import tw from '@/lib/tailwind';
 
 interface GlassCardProps extends ViewProps {
     intensity?: number;
+    noPadding?: boolean;
 }
 
-export function GlassCard({ children, style, ...props }: GlassCardProps) {
+export function GlassCard({ children, style, noPadding, ...props }: GlassCardProps) {
     return (
         <View
             style={[styles.glassContainer, tw`bg-card/40 border border-white/10 rounded-3xl overflow-hidden shadow-xl`, style]}
             {...props}
         >
-            <View style={tw`p-5`}>
-                {children}
-            </View>
+            {noPadding ? children : (
+                <View style={tw`p-5`}>
+                    {children}
+                </View>
+            )}
         </View>
     );
 }

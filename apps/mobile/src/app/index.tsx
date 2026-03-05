@@ -31,7 +31,7 @@ export default function Index() {
             <Image source={require('@/assets/logo.png')} style={tw`w-12 h-12 mr-3`} resizeMode="contain" />
             <Text style={tw`text-5xl text-white font-[InterTight] font-bold italic`}>enroute</Text>
           </View>
-          <Text style={tw`absolute bottom-10 text-gray-500 font-[InterTight-Regular] text-xs`}>
+          <Text style={tw`absolute bottom-10 text-gray-500 font-[InterTight] text-xs`}>
             v1.0.0
           </Text>
         </Animated.View>
@@ -65,9 +65,9 @@ export default function Index() {
               activeOpacity={0.8}
               style={tw`w-full bg-white py-4 rounded-full items-center justify-center mb-6 shadow-lg shadow-white/20`}
             >
-              <Text style={tw`text-black text-lg font-[InterTight-Bold]`}>Get started</Text>
+              <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>Get started</Text>
             </TouchableOpacity>
-            <Text style={tw`text-gray-500 font-[InterTight-Regular] text-xs`}>
+            <Text style={tw`text-gray-500 font-[InterTight] text-xs`}>
               v1.0.0
             </Text>
           </Animated.View>

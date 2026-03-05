@@ -29,7 +29,7 @@ export default function PersonaScreen() {
                 <View style={tw`flex-1 px-6 pt-4`}>
                     <View style={tw`mb-10`}>
                         <Text style={tw`text-3xl text-white font-[InterTight-Bold] mb-2`}>Setup AI persona</Text>
-                        <Text style={tw`text-gray-400 font-[InterTight-Regular] text-base`}>
+                        <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
                             Choose an avatar or voice you'd like to hear speak
                         </Text>
                     </View>
@@ -40,7 +40,7 @@ export default function PersonaScreen() {
                                 <View style={tw`bg-white/10 p-4 rounded-full mb-4`}>
                                     <User color="#fff" size={32} />
                                 </View>
-                                <Text style={tw`text-white font-[InterTight-Medium]`}>Male</Text>
+                                <Text style={tw`text-white font-[InterTight] font-medium`}>Male</Text>
                             </GlassCard>
                         </TouchableOpacity>
 
@@ -49,7 +49,7 @@ export default function PersonaScreen() {
                                 <View style={tw`bg-white/10 p-4 rounded-full mb-4`}>
                                     <User color="#fff" size={32} />
                                 </View>
-                                <Text style={tw`text-white font-[InterTight-Medium]`}>Female</Text>
+                                <Text style={tw`text-white font-[InterTight] font-medium`}>Female</Text>
                             </GlassCard>
                         </TouchableOpacity>
                     </View>
@@ -59,7 +59,7 @@ export default function PersonaScreen() {
                             <View style={tw`bg-white/10 p-4 rounded-full mb-4`}>
                                 <User color="#fff" size={32} />
                             </View>
-                            <Text style={tw`text-white font-[InterTight-Medium]`}>Neutral</Text>
+                            <Text style={tw`text-white font-[InterTight] font-medium`}>Neutral</Text>
                         </GlassCard>
                     </TouchableOpacity>
 

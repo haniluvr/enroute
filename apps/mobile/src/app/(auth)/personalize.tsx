@@ -54,16 +54,16 @@ export default function PersonalizeScreen() {
                 <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }} style={tw`px-6 pt-4`}>
                     <View style={tw`mb-8`}>
                         <Text style={tw`text-3xl text-white font-[InterTight-Bold] mb-2`}>Personalize your experience</Text>
-                        <Text style={tw`text-gray-400 font-[InterTight-Regular]`}>
+                        <Text style={tw`text-gray-400 font-[InterTight]`}>
                             Personalize your profile and choose add a name you'd like to be called
                         </Text>
                     </View>
 
                     <GlassCard style={tw`p-2 mb-8 border-white/10`}>
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Add Name</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Add Name</Text>
                             <TextInput
-                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight-Regular]`}
+                                style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 text-white font-[InterTight]`}
                                 placeholder="Enter name"
                                 placeholderTextColor="#555"
                                 value={name}
@@ -72,12 +72,12 @@ export default function PersonalizeScreen() {
                         </View>
 
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Career interest</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Career interest</Text>
                             <TouchableOpacity
                                 onPress={() => openDropdown('career')}
                                 style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 flex-row justify-between items-center`}
                             >
-                                <Text style={tw`font-[InterTight-Regular] ${careerInterest ? 'text-white' : 'text-[#555]'}`}>
+                                <Text style={tw`font-[InterTight] ${careerInterest ? 'text-white' : 'text-[#555]'}`}>
                                     {careerInterest || 'Select'}
                                 </Text>
                                 <ChevronDown color="#555" size={20} />
@@ -85,12 +85,12 @@ export default function PersonalizeScreen() {
                         </View>
 
                         <View style={tw`mb-4`}>
-                            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm mb-2 ml-1`}>Current level</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm mb-2 ml-1`}>Current level</Text>
                             <TouchableOpacity
                                 onPress={() => openDropdown('level')}
                                 style={tw`bg-[#12121A]/80 border border-white/10 rounded-xl px-4 py-4 flex-row justify-between items-center`}
                             >
-                                <Text style={tw`font-[InterTight-Regular] ${currentLevel ? 'text-white' : 'text-[#555]'}`}>
+                                <Text style={tw`font-[InterTight] ${currentLevel ? 'text-white' : 'text-[#555]'}`}>
                                     {currentLevel || 'Select'}
                                 </Text>
                                 <ChevronDown color="#555" size={20} />
@@ -119,7 +119,7 @@ export default function PersonalizeScreen() {
                             keyExtractor={item => item}
                             renderItem={({ item }) => (
                                 <TouchableOpacity onPress={() => handleSelect(item)} style={tw`py-4 border-b border-white/10`}>
-                                    <Text style={tw`text-white font-[InterTight-Medium] text-lg`}>{item}</Text>
+                                    <Text style={tw`text-white font-[InterTight] font-medium text-lg`}>{item}</Text>
                                 </TouchableOpacity>
                             )}
                         />

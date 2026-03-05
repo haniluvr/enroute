@@ -25,7 +25,7 @@ export default function HomeScreen() {
                 {/* Header */}
                 <View style={tw`px-6 pt-16 pb-6 flex-row justify-between items-center`}>
                     <View>
-                        <Text style={tw`text-gray-400 font-[InterTight-Medium] text-sm`}>Welcome back,</Text>
+                        <Text style={tw`text-gray-400 font-[InterTight] font-medium text-sm`}>Welcome back,</Text>
                         <Text style={tw`text-white font-[InterTight-Bold] text-3xl`}>{displayName}</Text>
                     </View>
                     <View style={tw`bg-white/10 p-3 rounded-full border border-white/20`}>
@@ -42,7 +42,7 @@ export default function HomeScreen() {
                             </View>
                             <Text style={tw`text-white font-[InterTight-Bold] text-xl`}>Ask Dahlia</Text>
                         </View>
-                        <Text style={tw`text-gray-300 font-[InterTight-Regular] mb-4 leading-5`}>
+                        <Text style={tw`text-gray-300 font-[InterTight] mb-4 leading-5`}>
                             Your AI mentor is ready. Review your latest mock-interview feedback or ask about the TechNova internship.
                         </Text>
                         <GlassButton
@@ -66,11 +66,11 @@ export default function HomeScreen() {
                                 </View>
                             </View>
 
-                            <Text style={tw`text-accent-cyan font-[InterTight-Medium] text-sm mb-3`}>{job.company}</Text>
+                            <Text style={tw`text-accent-cyan font-[InterTight] font-medium text-sm mb-3`}>{job.company}</Text>
 
                             <View style={tw`flex-row items-center mb-4`}>
                                 <MapPin color="#aaa" size={14} style={tw`mr-1`} />
-                                <Text style={tw`text-gray-400 font-[InterTight-Regular] text-sm`}>{job.distance} away</Text>
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>{job.distance} away</Text>
                                 <Text style={tw`text-gray-500 mx-2`}>•</Text>
                                 <Text style={tw`text-white font-[InterTight-SemiBold] text-sm`}>{job.salary}</Text>
                             </View>
@@ -78,7 +78,7 @@ export default function HomeScreen() {
                             <View style={tw`flex-row flex-wrap`}>
                                 {job.skills.map((skill, idx) => (
                                     <View key={idx} style={tw`bg-white/10 px-3 py-1 rounded-full mr-2 mb-2`}>
-                                        <Text style={tw`text-gray-300 text-xs font-[InterTight-Regular]`}>{skill}</Text>
+                                        <Text style={tw`text-gray-300 text-xs font-[InterTight]`}>{skill}</Text>
                                     </View>
                                 ))}
                             </View>
