@@ -5,7 +5,18 @@ const { getDefaultConfig } = require("expo/metro-config");
 // manually be compiled via Tailwind CLI or we must downgrade to NativeWind v2.
 const config = getDefaultConfig(__dirname);
 
-// Add webm to the list of assets that the bundler will bundle
-config.resolver.assetExts.push('webm');
+const { assetExts, sourceExts } = config.resolver;
+
+// Configure SVG transformer
+config.transformer = {
+    ...config.transformer,
+    babelTransformerPath: require.resolve("react-native-svg-transformer/expo")
+};
+
+config.resolver = {
+    ...config.resolver,
+    assetExts: assetExts.filter((ext) => ext !== "svg").concat('webm'),
+    sourceExts: [...sourceExts, "svg"]
+};
 
 module.exports = config;

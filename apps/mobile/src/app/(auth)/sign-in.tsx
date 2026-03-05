@@ -60,7 +60,7 @@ export default function SignInScreen() {
 
     const handleModalClose = () => {
         setShowSuccessModal(false);
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/home');
     };
 
     return (

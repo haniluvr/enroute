@@ -228,7 +228,7 @@ export default function SignUpScreen() {
 
     const handleModalClose = () => {
         setShowSuccessModal(false);
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/home');
     };
 
     const handlePersonaSelect = (id: string) => {

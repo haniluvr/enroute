@@ -37,6 +37,7 @@
   "private": true,
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "react-native-svg-transformer": "^1.5.3",
     "tailwindcss": "^3.3.2",
     "typescript": "~5.9.2"
   }
