@@ -187,7 +187,7 @@ export default function OnboardingScreen() {
                                 <Animated.View style={[styles.cardContainer, animatedStyle]}>
                                     <View style={styles.card}>
                                         <AnimatedGradient
-                                            colors={['#750080', '#2b6e6e', '#0e0e0e']}
+                                            colors={['#6d3659', '#af88ad', '#2b4e50', '#111111']}
                                             style={StyleSheet.absoluteFill}
                                         />
                                         <Image source={slide.image} style={styles.cardImage} resizeMode="contain" />

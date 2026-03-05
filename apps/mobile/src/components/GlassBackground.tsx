@@ -1,7 +1,7 @@
 import { View, StyleSheet } from 'react-native';
 import { AnimatedGradient } from './AnimatedGradient';
 
-const COLORS: [string, string, string] = ['#750080', '#2b6e6e', '#0e0e0e'];
+const COLORS: [string, string, string, string] = ['#6d3659', '#af88ad', '#2b4e50', '#111111'];
 
 interface GlassBackgroundProps {
     children: React.ReactNode;
@@ -10,12 +10,12 @@ interface GlassBackgroundProps {
 
 export function GlassBackground({
     children,
-    locations = [0.15, 0.5, 0.85] // Default wide dark center
+    locations = [0.0, 0.2, 0.55, 0.9] // 4-color: lilac → rose → teal → dark
 }: GlassBackgroundProps) {
     return (
         <View style={styles.container}>
             {/* Dark base */}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0e0e0e' }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#111111' }]} />
 
             <AnimatedGradient
                 colors={COLORS}
@@ -31,6 +31,6 @@ export function GlassBackground({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0e0e0e',
+        backgroundColor: '#111111',
     },
 });

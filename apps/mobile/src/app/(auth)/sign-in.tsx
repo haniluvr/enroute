@@ -1,11 +1,14 @@
 import tw from '@/lib/tailwind';
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
-import { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, Animated, Dimensions } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
 import { Link, router } from 'expo-router';
 import { ChevronLeft, Eye, EyeOff, X } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { Modal } from 'react-native';
+import { BlurView } from 'expo-blur';
 import LottieView from 'lottie-react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function SignInScreen() {
     const [email, setEmail] = useState('');
@@ -17,6 +20,32 @@ export default function SignInScreen() {
     // State to track if the login attempt failed
     const [hasLoginFailed, setHasLoginFailed] = useState(false);
 
+    // Animated modal values
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+    const cardTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+    useEffect(() => {
+        if (showSuccessModal) {
+            Animated.parallel([
+                Animated.timing(backdropOpacity, {
+                    toValue: 1, duration: 280, useNativeDriver: true,
+                }),
+                Animated.spring(cardTranslateY, {
+                    toValue: 0, useNativeDriver: true, damping: 22, stiffness: 200,
+                }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(backdropOpacity, {
+                    toValue: 0, duration: 200, useNativeDriver: true,
+                }),
+                Animated.timing(cardTranslateY, {
+                    toValue: SCREEN_HEIGHT, duration: 220, useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [showSuccessModal]);
+
     const handleLogin = () => {
         setIsLoading(true);
         // Reset failure state on new attempt
@@ -25,13 +54,7 @@ export default function SignInScreen() {
         // Simulate networking
         setTimeout(() => {
             setIsLoading(false);
-
-            // Temporary simple simulation: If password isn't 'password', fail it.
-            if (password !== 'password') {
-                setHasLoginFailed(true);
-            } else {
-                setShowSuccessModal(true);
-            }
+            setShowSuccessModal(true);
         }, 1500);
     };
 
@@ -41,7 +64,7 @@ export default function SignInScreen() {
     };
 
     return (
-        <GlassBackground locations={[0.01, 0.17, 0.25]}>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <SafeAreaView style={tw`flex-1 justify-between`}>
 
                 <View style={tw`px-6 pt-4`}>
@@ -147,35 +170,49 @@ export default function SignInScreen() {
             <Modal
                 transparent
                 visible={showSuccessModal}
-                animationType="slide"
+                animationType="none"
                 onRequestClose={handleModalClose}
+                statusBarTranslucent
             >
-                <View style={tw`flex-1 bg-black/60 justify-end px-4 pb-4`}>
-                    <View style={tw`w-full bg-[#1C1C1E] rounded-3xl p-6 pt-10 border border-white/10 items-center shadow-2xl`}>
-                        {/* Close Button */}
-                        <TouchableOpacity
-                            onPress={handleModalClose}
-                            style={tw`absolute top-4 right-4 w-9 h-9 bg-white/10 rounded-xl items-center justify-center z-10`}
-                        >
-                            <X color="#999" size={20} />
-                        </TouchableOpacity>
+                <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                    {/* Dissolving blurred backdrop */}
+                    <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
+                        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                    </Animated.View>
 
-                        {/* Title and Text */}
-                        <Text style={tw`text-3xl text-white font-[InterTight] font-medium mt-8 mb-2 text-center`}>
-                            Welcome admin!
-                        </Text>
-                        <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-5 mb-4 px-2`}>
-                            Ask questions, get career roadmaps,{'\n'}and explore resources
-                        </Text>
+                    {/* Sliding card */}
+                    <Animated.View
+                        style={[
+                            tw`absolute bottom-0 left-0 right-0 px-4 pb-4`,
+                            { transform: [{ translateY: cardTranslateY }] },
+                        ]}
+                    >
+                        <View style={tw`w-full bg-[#1C1C1E] rounded-3xl p-6 pt-10 border border-white/10 items-center shadow-2xl`}>
+                            {/* Close Button */}
+                            <TouchableOpacity
+                                onPress={handleModalClose}
+                                style={tw`absolute top-4 right-4 w-9 h-9 bg-white/10 rounded-xl items-center justify-center z-10`}
+                            >
+                                <X color="#999" size={20} />
+                            </TouchableOpacity>
 
-                        {/* Lottie Animation */}
-                        <LottieView
-                            source={require('@/assets/success.json')}
-                            autoPlay
-                            loop={false}
-                            style={tw`w-30 h-30`}
-                        />
-                    </View>
+                            {/* Title and Text */}
+                            <Text style={tw`text-3xl text-white font-[InterTight] font-medium mt-8 mb-2 text-center`}>
+                                Welcome, {email ? email.split('@')[0] : 'admin'}!
+                            </Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-5 mb-4 px-2`}>
+                                Ask questions, get career roadmaps,{'\n'}and explore resources
+                            </Text>
+
+                            {/* Lottie Animation */}
+                            <LottieView
+                                source={require('@/assets/success.json')}
+                                autoPlay
+                                loop={false}
+                                style={tw`w-30 h-30`}
+                            />
+                        </View>
+                    </Animated.View>
                 </View>
             </Modal>
 
