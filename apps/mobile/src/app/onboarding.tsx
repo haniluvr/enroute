@@ -7,7 +7,7 @@ import Animated, {
     runOnJS, interpolate, Extrapolation
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { LinearGradient } from 'expo-linear-gradient';
+import { AnimatedGradient } from '@/components/AnimatedGradient';
 import { router } from 'expo-router';
 import { useState, useCallback } from 'react';
 
@@ -186,10 +186,8 @@ export default function OnboardingScreen() {
                             <GestureDetector key={slide.id} gesture={isTopCard ? panGesture : Gesture.Native()}>
                                 <Animated.View style={[styles.cardContainer, animatedStyle]}>
                                     <View style={styles.card}>
-                                        <LinearGradient
-                                            colors={['#1a0a1e', '#0d2020', '#111111']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
+                                        <AnimatedGradient
+                                            colors={['#750080', '#2b6e6e', '#0e0e0e']}
                                             style={StyleSheet.absoluteFill}
                                         />
                                         <Image source={slide.image} style={styles.cardImage} resizeMode="contain" />
@@ -249,6 +247,7 @@ const styles = StyleSheet.create({
         borderRadius: 28,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.12)',
+        backgroundColor: '#050505', // Solid base to prevent seeing cards behind it
         overflow: 'hidden',
     },
     cardImage: {

@@ -14,12 +14,24 @@ export default function SignInScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+    // State to track if the login attempt failed
+    const [hasLoginFailed, setHasLoginFailed] = useState(false);
+
     const handleLogin = () => {
         setIsLoading(true);
+        // Reset failure state on new attempt
+        setHasLoginFailed(false);
+
         // Simulate networking
         setTimeout(() => {
             setIsLoading(false);
-            setShowSuccessModal(true);
+
+            // Temporary simple simulation: If password isn't 'password', fail it.
+            if (password !== 'password') {
+                setHasLoginFailed(true);
+            } else {
+                setShowSuccessModal(true);
+            }
         }, 1500);
     };
 
@@ -29,7 +41,7 @@ export default function SignInScreen() {
     };
 
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.01, 0.17, 0.25]}>
             <SafeAreaView style={tw`flex-1 justify-between`}>
 
                 <View style={tw`px-6 pt-4`}>
@@ -93,11 +105,13 @@ export default function SignInScreen() {
                     </View>
 
                     {/* Forgot Password */}
-                    <TouchableOpacity style={tw`self-end mb-8`}>
-                        <Text style={tw`text-[#FF453A] font-[InterTight] font-medium text-sm`}>
-                            Forgot password?
-                        </Text>
-                    </TouchableOpacity>
+                    {hasLoginFailed && (
+                        <TouchableOpacity style={tw`self-end mb-8`}>
+                            <Text style={tw`text-[#FF453A] font-[InterTight] font-medium text-sm`}>
+                                Forgot password?
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Bottom Actions */}
