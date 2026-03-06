@@ -43,17 +43,30 @@ export default function TabLayout() {
 
     // Android / Regular Tabs
     return (
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <ThemeProvider value={DarkTheme}>
             <Tabs
                 screenOptions={{
                     headerShown: false,
-                    tabBarActiveTintColor: colorScheme === 'dark' ? '#fff' : '#000',
+                    tabBarActiveTintColor: '#ffffff',
+                    tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
+                    tabBarShowLabel: true,
+                    tabBarActiveBackgroundColor: 'transparent',
+                    tabBarItemStyle: {
+                        paddingVertical: 10,
+                    },
+                    tabBarLabelStyle: {
+                        fontSize: 12,
+                        marginTop: 4,
+                        fontWeight: '500',
+                    },
                     tabBarStyle: {
-                        backgroundColor: colorScheme === 'dark' ? '#121212' : '#fff',
+                        backgroundColor: '#111111',
+                        borderTopWidth: 1,
                         borderTopColor: 'rgba(255,255,255,0.05)',
-                        paddingBottom: 8,
-                        paddingTop: 8,
-                        height: 64,
+                        height: 70,
+                        paddingBottom: 10,
+                        elevation: 0,
+                        shadowOpacity: 0,
                     },
                 }}
             >
@@ -61,22 +74,22 @@ export default function TabLayout() {
                     name="home"
                     options={{
                         title: 'Home',
-                        tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+                        tabBarIcon: ({ color }) => <Home color={color} size={24} />,
                     }}
                 />
                 <Tabs.Screen
                     name="path"
                     options={{
                         title: 'Path',
-                        tabBarIcon: ({ color, size }) => <Map color={color} size={size} />,
+                        tabBarIcon: ({ color }) => <Map color={color} size={24} />,
                     }}
                 />
                 <Tabs.Screen
                     name="dahlia"
                     options={{
                         title: 'Dahlia',
-                        tabBarIcon: ({ color, size }) => (
-                            <LogoIcon width={size} height={size} fill={color} />
+                        tabBarIcon: ({ color }) => (
+                            <LogoIcon width={24} height={24} fill={color} />
                         ),
                     }}
                 />
@@ -84,14 +97,14 @@ export default function TabLayout() {
                     name="explore"
                     options={{
                         title: 'Explore',
-                        tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
+                        tabBarIcon: ({ color }) => <Compass color={color} size={24} />,
                     }}
                 />
                 <Tabs.Screen
                     name="profile"
                     options={{
                         title: 'Profile',
-                        tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+                        tabBarIcon: ({ color }) => <User color={color} size={24} />,
                     }}
                 />
             </Tabs>
