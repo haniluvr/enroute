@@ -43,7 +43,7 @@ export default function PersonalizeScreen() {
     };
 
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <SafeAreaView style={tw`flex-1`}>
                 <View style={tw`px-4 pt-4`}>
                     <TouchableOpacity onPress={() => router.back()} style={tw`bg-white/10 p-2 rounded-full self-start`}>

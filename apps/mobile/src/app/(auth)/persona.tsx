@@ -17,7 +17,7 @@ export default function PersonaScreen() {
     };
 
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <SafeAreaView style={tw`flex-1`}>
                 {/* Back Button */}
                 <View style={tw`px-4 pt-4`}>

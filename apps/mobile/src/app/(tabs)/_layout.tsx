@@ -20,7 +20,7 @@ export default function TabLayout() {
 
                 <NativeTabs.Trigger name="dahlia">
                     <Label>Dahlia</Label>
-                    <Icon sf="microphone.fill" />
+                    <Icon sf="waveform.and.mic" />
                 </NativeTabs.Trigger>
 
                 <NativeTabs.Trigger name="explore">

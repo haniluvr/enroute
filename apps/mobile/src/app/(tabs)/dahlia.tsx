@@ -5,7 +5,7 @@ import { Sparkles } from 'lucide-react-native';
 
 export default function DahliaScreen() {
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <View style={tw`flex-1 items-center justify-center p-6`}>
                 <View style={tw`bg-accent-pink/20 p-4 rounded-full mb-6`}>
                     <Sparkles color="#ff007f" size={48} />

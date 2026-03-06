@@ -8,7 +8,7 @@ export default function RoadmapScreen() {
     const router = useRouter();
 
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             {/* Header */}
             <View style={tw`px-6 pt-16 pb-4 flex-row items-center`}>
                 <TouchableOpacity

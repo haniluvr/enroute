@@ -6,7 +6,7 @@ import { GlassCard } from '@/components/GlassCard';
 
 export default function DiscoverScreen() {
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <View style={tw`flex-1 items-center justify-center px-6`}>
 
                 {/* Placeholder for actual Card Swiper */}

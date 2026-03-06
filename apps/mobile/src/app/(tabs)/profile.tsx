@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 
 export default function ProfileScreen() {
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <View style={tw`flex-1 items-center justify-center px-6`}>
                 {/* Profile Placeholder Header */}
                 <View style={tw`w-24 h-24 rounded-full bg-white/10 mb-6 border border-white/20 items-center justify-center`}>

@@ -14,11 +14,11 @@ export default function HomeScreen() {
     const displayName = user?.displayName || 'Akin';
 
     return (
-        <GlassBackground>
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={tw`px-6 pt-16 pb-6 flex-row justify-between items-center`}>
-                    <Text style={tw`text-white font-[InterTight-Bold] text-3xl`}>Hi {displayName}! 👋</Text>
+                    <Text style={tw`text-white font-[InterTight] font-semibold text-3xl`}>Hi {displayName}! 👋</Text>
 
                     <TouchableOpacity
                         style={tw`bg-white/10 p-2.5 rounded-xl border border-white/10`}
