@@ -59,13 +59,13 @@ export default function PathScreen() {
                         <TouchableOpacity
                             activeOpacity={0.8}
                             onPress={() => router.push('/career-interest-test')}
-                            style={tw`aspect-square bg-white/10 border border-white/15 rounded-3xl p-6 justify-center items-center`}
+                            style={tw`h-69 bg-white/10 border border-white/15 rounded-3xl p-6 justify-center items-center`}
                         >
-                            <View style={tw`w-16 h-16 rounded-2xl bg-white/10 items-center justify-center mb-4`}>
-                                <Search color="#fff" size={32} />
+                            <View style={tw`items-center justify-center mb-4`}>
+                                <Search color="#fcfcfc33" size={100} />
                             </View>
                             <Text
-                                style={tw`text-white font-[InterTight-SemiBold] text-3xl text-center`}
+                                style={tw`text-white font-[InterTight] font-semibold text-3xl text-center`}
                             >
                                 Let's find your perfect career path
                             </Text>
