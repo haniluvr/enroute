@@ -16,17 +16,17 @@ const { width, height } = Dimensions.get('window');
 const SLIDES = [
     {
         id: '1',
-        image: require('@/assets/onboarding-cards/onboarding-1.png'),
+        image: require('@/assets/onboarding-cards/onboarding-1.webp'),
         title: "Your personalized\ncareer journey",
     },
     {
         id: '2',
-        image: require('@/assets/onboarding-cards/onboarding-2.png'),
+        image: require('@/assets/onboarding-cards/onboarding-2.webp'),
         title: "Voice powered\ncareer assistant",
     },
     {
         id: '3',
-        image: require('@/assets/onboarding-cards/onboarding-3.png'),
+        image: require('@/assets/onboarding-cards/onboarding-3.webp'),
         title: "Curated resources\n& Roadmaps",
     },
 ];

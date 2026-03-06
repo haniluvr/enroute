@@ -30,16 +30,22 @@ export default function HomeScreen() {
 
                 {/* Search Bar / Ask Dahlia */}
                 <View style={tw`px-6 mb-8`}>
-                    <TouchableOpacity
-                        style={tw`bg-white/10 border border-white/15 rounded-full px-5 py-3.5 flex-row items-center justify-center`}
-                        activeOpacity={0.8}
-                        onPress={() => router.push('/(tabs)/dahlia')}
-                    >
-                        <Sparkles color="#fff" size={20} style={tw`mr-2 opacity-80`} />
-                        <Text style={tw`text-white/80 font-[InterTight] text-[15px]`}>
-                            Ask Dahlia anything related to your career path
-                        </Text>
-                    </TouchableOpacity>
+                    <View style={tw`bg-white/10 border border-white/15 rounded-full px-5 py-0 flex-row items-center`}>
+                        <Sparkles color="#fff" size={20} style={tw`mr-3 opacity-80`} />
+                        <TextInput
+                            style={tw`flex-1 text-white font-[InterTight] text-[15px] py-3.5`}
+                            placeholder="Ask Dahlia anything related to your career path"
+                            placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                            onChangeText={(text) => {
+                                if (text.length > 0) {
+                                    router.push({
+                                        pathname: '/(tabs)/dahlia',
+                                        params: { q: text }
+                                    });
+                                }
+                            }}
+                        />
+                    </View>
                 </View>
 
                 {/* Quick Start 2x2 Grid */}
