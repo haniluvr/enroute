@@ -30,11 +30,11 @@ const SettingsOption = ({
             style={tw`flex-row items-center py-4`}
         >
             <View style={tw`w-12 h-12 rounded-2xl bg-white/10 items-center justify-center mr-4 shadow-sm`}>
-                <Icon size={24} color={isDestructive ? '#F472B6' : '#FFFFFF'} />
+                <Icon size={24} color={isDestructive ? '#e7000b' : '#FFFFFF'} />
             </View>
 
             <View style={tw`flex-1`}>
-                <Text style={tw`text-white text-xl font-inter-semibold ${isDestructive ? 'text-accent-pink' : ''}`}>
+                <Text style={tw`text-white text-xl font-inter-semibold ${isDestructive ? 'text-red-600' : ''}`}>
                     {title}
                 </Text>
                 <Text style={tw`text-white/60 text-lg font-inter`}>

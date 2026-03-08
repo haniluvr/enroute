@@ -6,18 +6,25 @@ import {
     Sparkles,
     Search,
     ChevronLeft,
+    ChevronUp,
+    ChevronDown,
     Settings,
     Mic,
+    Type,
+    UserCheck,
+    Edit3,
+    Trash2,
+    Calendar,
+    Clock,
     FileText,
-    PhoneOff,
     MoreVertical,
-    X,
     Paperclip,
-    Send,
-    Bookmark,
-    Share2,
+    PhoneOff,
     RotateCcw,
-    Check
+    Send,
+    Share2,
+    X,
+    Bookmark
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
@@ -41,15 +48,37 @@ export default function DahliaScreen() {
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [callDuration, setCallDuration] = useState(0); // in seconds
     const [isTimerRunning, setIsTimerRunning] = useState(false);
+    const [showTranscriptionOptions, setShowTranscriptionOptions] = useState(false);
+    const [showTextSettings, setShowTextSettings] = useState(false);
+    const [transcriptionFont, setTranscriptionFont] = useState('InterTight');
+    const [transcriptionFontSize, setTranscriptionFontSize] = useState(15);
 
     // Advanced UI States
     const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
+    const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+    const [notes, setNotes] = useState([
+        { id: 1, title: 'Salary', content: 'Product managers are very high in demand in todays..', time: '2:31 PM' },
+        { id: 2, title: 'Skills to learn', content: 'Focus on communication and technical understanding..', time: '2:32 PM' }
+    ]);
+    const [noteInput, setNoteInput] = useState('');
     const windowHeight = Dimensions.get('window').height;
     const notesHeight = useRef(new Animated.Value(windowHeight * 0.3)).current;
     const notesBaseHeight = useRef(windowHeight * 0.3);
 
     // Pulsing animation for voice mode
     const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    const formatDurationLabel = (seconds: number) => {
+        if (seconds >= 3600) {
+            const hours = Math.floor(seconds / 3600);
+            return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+        } else if (seconds >= 60) {
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+        } else {
+            return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
+        }
+    };
 
     useEffect(() => {
         if (viewState === 'active_call' && callMode === 'voice') {
@@ -77,7 +106,14 @@ export default function DahliaScreen() {
         let interval: NodeJS.Timeout;
         if (viewState === 'active_call' && isTimerRunning) {
             interval = setInterval(() => {
-                setCallDuration(prev => prev + 1);
+                setCallDuration(prev => {
+                    if (prev >= 7200) { // 2 hours limit
+                        setIsTimerRunning(false);
+                        setShowSaveModal(true);
+                        return prev;
+                    }
+                    return prev + 1;
+                });
             }, 1000);
         }
         return () => clearInterval(interval);
@@ -145,15 +181,17 @@ export default function DahliaScreen() {
                             <Text style={tw`text-[#EEDF7A] font-[InterTight] font-medium text-xs`}>{persona.type}</Text>
                         </View>
                     </View>
-                    <Text style={tw`text-white font-[InterTight-Bold] text-lg mb-1`}>{persona.name}</Text>
-                    <Text style={tw`text-gray-300 font-[InterTight] font-medium text-sm mb-2`}>{persona.specialization}</Text>
-                    <Text style={tw`text-gray-400 font-[InterTight] text-xs leading-4`} numberOfLines={2}>
-                        {persona.description}
-                    </Text>
+                    <Text style={tw`text-white font-[InterTight] font-bold text-xl mb-1`}>{persona.name}</Text>
+                    <Text style={tw`text-gray-300 font-[InterTight] text-lg mb-2`}>{persona.specialization}</Text>
+                    {isMain && (
+                        <Text style={tw`text-gray-400 font-[InterTight] text-base leading-4`} numberOfLines={2}>
+                            {persona.description}
+                        </Text>
+                    )}
                     {isMain && isSelected && (
                         <View style={tw`flex-row items-center mt-4`}>
-                            <Check color="#2b4e50" size={14} style={tw`mr-1`} />
-                            <Text style={tw`text-[#2b4e50] font-[InterTight] font-medium text-xs capitalize`}>Current coach</Text>
+                            <UserCheck color="#2b4e50" size={14} style={tw`mr-1`} />
+                            <Text style={tw`text-[#2b4e50] font-[InterTight] font-medium text-sm capitalize`}>Current coach</Text>
                         </View>
                     )}
                 </GlassCard>
@@ -170,14 +208,14 @@ export default function DahliaScreen() {
                     </View>
                 </TouchableOpacity>
 
-                <Text style={tw`text-white font-[InterTight-Bold] text-2xl mb-1 px-6`}>Choose your career coach</Text>
-                <Text style={tw`text-gray-400 font-[InterTight] text-base mb-8 px-6`}>Who do you want to talk to today?</Text>
+                <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-1 px-6`}>Choose your career coach</Text>
+                <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-6 px-6`}>Who do you want to talk to today?</Text>
 
                 <View style={tw`px-6`}>
                     {renderCoachCard(selectedPersona, true)}
                 </View>
 
-                <Text style={tw`text-gray-300 font-[InterTight-Medium] text-lg mb-4 px-6`}>Other coaches</Text>
+                <Text style={tw`text-gray-300 font-[InterTight] font-medium text-xl mb-4 px-6`}>Other coaches</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-4 pl-6`}>
                     {PERSONAS.filter(p => p.id !== selectedPersona.id).map(persona => (
                         <View key={persona.id}>
@@ -271,20 +309,50 @@ export default function DahliaScreen() {
 
                     {transcriptionEnabled && (
                         <View style={tw`h-[47%] mb-5`}>
-                            <GlassCard style={tw`flex-1 p-6 bg-black/40 border-t border-white/10 rounded-[40px]`} noPadding>
+                            <GlassCard style={tw`flex-1 p-6 bg-white/5 border-t border-white/10 rounded-[40px]`} noPadding>
                                 <View style={tw`flex-row justify-between items-center mb-4`}>
                                     <View style={tw`flex-row items-center`}>
-                                        <Sparkles color="#ff007f" size={16} style={tw`mr-2`} />
+                                        <Sparkles color="#fcfcfc" size={16} style={tw`mr-2`} />
                                         <Text style={tw`text-gray-300 font-[InterTight] font-medium text-sm`}>Transcription enabled</Text>
                                     </View>
-                                    <TouchableOpacity>
-                                        <MoreVertical color="#888" size={18} />
-                                    </TouchableOpacity>
+                                    <View style={tw`items-center`}>
+                                        <TouchableOpacity
+                                            onPress={() => setShowTranscriptionOptions(!showTranscriptionOptions)}
+                                            style={tw`w-10 h-10 items-center justify-center rounded-full bg-white/5 border border-white/10`}
+                                        >
+                                            <MoreVertical color={showTranscriptionOptions ? "#fff" : "#888"} size={18} />
+                                        </TouchableOpacity>
+
+                                        {showTranscriptionOptions && (
+                                            <Animated.View style={tw`absolute top-12 items-center gap-2 z-50`}>
+                                                <TouchableOpacity
+                                                    style={tw`w-10 h-10 items-center justify-center rounded-full bg-[#1C1C1E] border border-white/10 shadow-2xl`}
+                                                    onPress={() => {
+                                                        setShowTextSettings(true);
+                                                        setShowTranscriptionOptions(false);
+                                                    }}
+                                                >
+                                                    <Type color="#fff" size={18} />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={tw`w-10 h-10 items-center justify-center rounded-full bg-[#1C1C1E] border border-white/10 shadow-2xl`}
+                                                    onPress={() => setShowTranscriptionOptions(false)}
+                                                >
+                                                    <X color="#fff" size={18} />
+                                                </TouchableOpacity>
+                                            </Animated.View>
+                                        )}
+                                    </View>
                                 </View>
                                 <Text style={tw`text-gray-400 font-[InterTight] font-bold text-xs mb-2 uppercase tracking-widest`}>YOU:</Text>
-                                <Text style={tw`text-white font-[InterTight] text-[15px] leading-6`}>
-                                    {MOCK_TRANSCRIPTION}
-                                </Text>
+                                <ScrollView showsVerticalScrollIndicator={false}>
+                                    <Text style={[
+                                        tw`text-white leading-6`,
+                                        { fontFamily: transcriptionFont, fontSize: transcriptionFontSize }
+                                    ]}>
+                                        {MOCK_TRANSCRIPTION}
+                                    </Text>
+                                </ScrollView>
                             </GlassCard>
                         </View>
                     )}
@@ -316,7 +384,7 @@ export default function DahliaScreen() {
                         </ScrollView>
 
                         {/* Chat Input Inside Card */}
-                        <View style={tw`flex-row items-center bg-white/5 rounded-full px-4 border border-white/10 py-1`}>
+                        <View style={tw`flex-row items-center bg-white/5 rounded-full p-2 border border-white/10`}>
                             <TouchableOpacity style={tw`p-2`}>
                                 <Paperclip color="#aaa" size={20} />
                             </TouchableOpacity>
@@ -349,7 +417,10 @@ export default function DahliaScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        onPress={() => setShowSaveModal(true)}
+                        onPress={() => {
+                            setIsTimerRunning(false);
+                            setShowSaveModal(true);
+                        }}
                         style={tw`bg-red-500/90 w-11 h-11 rounded-full items-center justify-center shadow-lg shadow-red-500/30 ml-1`}
                     >
                         <PhoneOff color="#fff" size={18} />
@@ -373,42 +444,42 @@ export default function DahliaScreen() {
                 </TouchableOpacity>
             </View>
 
-            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-[17px] mb-4`}>Key insights</Text>
+            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-[20px] mb-4`}>Key Insights</Text>
             <GlassCard style={tw`p-6 bg-white/5 border border-white/10 mb-8`} noPadding>
-                <Text style={tw`text-gray-500 font-[InterTight-Bold] text-xs mb-4 uppercase tracking-widest`}>AI generated:</Text>
+                <Text style={tw`text-gray-500 font-[InterTight] font-bold text-sm mb-4 uppercase tracking-widest`}>AI generated:</Text>
                 {MOCK_INSIGHTS.map((insight, i) => (
                     <View key={i} style={tw`flex-row items-center mb-3`}>
                         <View style={tw`w-1.5 h-1.5 bg-white rounded-full mr-3`} />
-                        <Text style={tw`text-gray-200 font-[InterTight] text-[15px]`}>{insight}</Text>
+                        <Text style={tw`text-gray-200 font-[InterTight] font-light text-base`}>{insight}</Text>
                     </View>
                 ))}
             </GlassCard>
 
-            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-[17px] mb-4`}>Key Quotes</Text>
+            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-[20px] mb-4`}>Key Quotes</Text>
             {MOCK_QUOTES.map((quote, i) => (
                 <GlassCard key={i} style={tw`p-5 bg-white/5 border border-white/10 mb-4`} noPadding>
                     <View style={tw`flex-row`}>
                         <View style={tw`w-1.5 h-1.5 bg-white rounded-full mr-3 mt-2`} />
-                        <Text style={tw`text-gray-200 font-[InterTight] text-[14px] leading-5 flex-1 italic`}>
-                            "{quote}"
+                        <Text style={tw`text-gray-200 font-[InterTight] font-light text-base leading-5 flex-1`}>
+                            {quote}
                         </Text>
                     </View>
                 </GlassCard>
             ))}
 
-            <Text style={tw`text-gray-400 font-[InterTight-Medium] text-[17px] mt-4 mb-4`}>Actions</Text>
+            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-[20px] mt-4 mb-4`}>Actions</Text>
             <View style={tw`mb-20`}>
-                <TouchableOpacity style={tw`flex-row items-center border border-white/10 rounded-2xl py-4 px-6 mb-3`}>
+                <TouchableOpacity style={tw`flex-row items-center justify-center border border-white/10 rounded-full py-4 px-6 mb-3`}>
                     <Bookmark color="#aaa" size={20} style={tw`mr-4`} />
-                    <Text style={tw`text-gray-300 font-[InterTight-Medium]`}>See full transcript</Text>
+                    <Text style={tw`text-gray-300 font-[InterTight] font-medium text-lg`}>See full transcript</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={tw`flex-row items-center border border-white/10 rounded-2xl py-4 px-6 mb-3`}>
+                <TouchableOpacity style={tw`flex-row items-center justify-center border border-white/10 rounded-full py-4 px-6 mb-3`}>
                     <Share2 color="#aaa" size={20} style={tw`mr-4`} />
-                    <Text style={tw`text-gray-300 font-[InterTight-Medium]`}>Export highlights</Text>
+                    <Text style={tw`text-gray-300 font-[InterTight] font-medium text-lg`}>Export highlights</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={tw`flex-row items-center border border-white/10 rounded-2xl py-4 px-6 mb-6`}>
+                <TouchableOpacity style={tw`flex-row items-center justify-center border border-white/10 rounded-full py-4 px-6 mb-3`}>
                     <RotateCcw color="#aaa" size={20} style={tw`mr-4`} />
-                    <Text style={tw`text-gray-300 font-[InterTight-Medium]`}>Replay call</Text>
+                    <Text style={tw`text-gray-300 font-[InterTight] font-medium text-lg`}>Replay call</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -435,7 +506,13 @@ export default function DahliaScreen() {
                         <View style={tw`flex-1 items-center justify-center px-8`}>
                             <BlurView intensity={30} tint="dark" style={tw`absolute inset-0`} />
                             <View style={tw`bg-[#1C1C1E] w-full p-8 rounded-[40px] border border-white/10 items-center`}>
-                                <TouchableOpacity style={tw`absolute top-6 right-6`} onPress={() => setShowSaveModal(false)}>
+                                <TouchableOpacity
+                                    style={tw`absolute top-6 right-6`}
+                                    onPress={() => {
+                                        setShowSaveModal(false);
+                                        setIsTimerRunning(true);
+                                    }}
+                                >
                                     <X color="#aaa" size={20} />
                                 </TouchableOpacity>
 
@@ -443,7 +520,7 @@ export default function DahliaScreen() {
                                     Save this conversation?
                                 </Text>
                                 <Text style={tw`text-gray-400 font-[InterTight] text-center mb-8`}>
-                                    We've transcribed {Math.floor(callDuration / 60)} minutes and {callDuration % 60} seconds of conversation
+                                    We've transcribed {formatDurationLabel(callDuration)} of conversation
                                 </Text>
 
                                 <View style={tw`bg-accent-teal/20 p-6 rounded-full mb-8`}>
@@ -460,7 +537,13 @@ export default function DahliaScreen() {
                                 >
                                     <Text style={tw`text-black font-[InterTight-Bold] text-lg`}>Save and Exit</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => setShowSaveModal(false)} style={tw`py-3`}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setShowSaveModal(false);
+                                        setIsTimerRunning(true);
+                                    }}
+                                    style={tw`py-3`}
+                                >
                                     <Text style={tw`text-gray-400 font-[InterTight-Bold]`}>Continue call</Text>
                                 </TouchableOpacity>
                             </View>
@@ -468,38 +551,42 @@ export default function DahliaScreen() {
                     </Modal>
 
                     {/* Notes Modal (Resizable) */}
-                    <Modal visible={showNotes} transparent animationType="none">
+                    <Modal visible={showNotes} transparent animationType="slide">
                         <View style={tw`flex-1 justify-end`}>
                             <TouchableOpacity style={tw`flex-1`} onPress={() => setShowNotes(false)} />
                             <Animated.View style={[
-                                tw`bg-[#1C1C1E]/95 rounded-t-[40px] border-t border-white/20 p-8 overflow-hidden`,
+                                tw`bg-[#1C1C1E]/95 rounded-t-[40px] border-t border-white/20 overflow-hidden`,
                                 { height: notesHeight }
                             ]}>
                                 <View
                                     {...notesPanResponder.panHandlers}
-                                    style={tw`items-center pb-4 -mt-4`}
+                                    style={tw`items-center py-4`}
                                 >
                                     <View style={tw`w-12 h-1.5 bg-white/20 rounded-full`} />
                                 </View>
 
-                                <View style={tw`flex-row justify-between items-center mb-8`}>
+                                <View style={tw`flex-row justify-between items-center mb-8 px-8`}>
                                     <Text style={tw`text-white font-[InterTight-Bold] text-2xl`}>Notes</Text>
                                     <TouchableOpacity onPress={() => setShowNotes(false)}>
                                         <X color="#aaa" size={24} />
                                     </TouchableOpacity>
                                 </View>
 
-                                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-20`}>
-                                    {[
-                                        { id: 1, title: 'Salary', content: 'Product managers are very high in demand in todays..', time: '2:31 PM' },
-                                        { id: 2, title: 'Skills to learn', content: 'Focus on communication and technical understanding..', time: '2:32 PM' }
-                                    ].map((note) => (
+                                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={tw`pb-36 px-8`}>
+                                    {notes.map((note) => (
                                         <TouchableOpacity
                                             key={note.id}
                                             activeOpacity={0.9}
-                                            onPress={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}
+                                            onPress={() => {
+                                                if (editingNoteId !== note.id) {
+                                                    setExpandedNoteId(expandedNoteId === note.id ? null : note.id);
+                                                }
+                                            }}
                                         >
-                                            <GlassCard style={tw`p-5 bg-white/5 border border-white/10 mb-4`} noPadding>
+                                            <GlassCard style={[
+                                                tw`p-5 bg-white/5 border border-white/10 mb-4`,
+                                                expandedNoteId === note.id && tw`py-8`
+                                            ]} noPadding>
                                                 <View style={tw`flex-row justify-between items-center mb-2`}>
                                                     {expandedNoteId === note.id ? (
                                                         <Text style={tw`text-gray-500 font-[InterTight] text-[10px]`}>{note.time}</Text>
@@ -507,35 +594,93 @@ export default function DahliaScreen() {
                                                         <Text style={tw`text-white font-[InterTight-Bold] text-lg`}>{note.title}</Text>
                                                     )}
 
-                                                    {expandedNoteId === note.id ? (
+                                                    {expandedNoteId === note.id && !editingNoteId ? (
                                                         <View style={tw`flex-row`}>
-                                                            <TouchableOpacity style={tw`mr-3 bg-white/10 p-1.5 rounded-lg`}>
-                                                                <FileText color="#fff" size={14} />
+                                                            <TouchableOpacity
+                                                                style={tw`mr-3 bg-white/10 p-2 rounded-lg`}
+                                                                onPress={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingNoteId(note.id);
+                                                                }}
+                                                            >
+                                                                <Edit3 color="#fff" size={14} />
                                                             </TouchableOpacity>
-                                                            <TouchableOpacity style={tw`bg-red-500/20 p-1.5 rounded-lg`}>
-                                                                <X color="#ff4444" size={14} />
+                                                            <TouchableOpacity
+                                                                style={tw`bg-red-500/20 p-2 rounded-lg`}
+                                                                onPress={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setNotes(notes.filter(n => n.id !== note.id));
+                                                                }}
+                                                            >
+                                                                <Trash2 color="#ff4444" size={14} />
                                                             </TouchableOpacity>
                                                         </View>
+                                                    ) : expandedNoteId === note.id && editingNoteId === note.id ? (
+                                                        <TouchableOpacity
+                                                            style={tw`bg-accent-teal/20 p-2 rounded-lg`}
+                                                            onPress={() => setEditingNoteId(null)}
+                                                        >
+                                                            <UserCheck color="#4fd1c5" size={14} />
+                                                        </TouchableOpacity>
                                                     ) : (
                                                         <Text style={tw`text-gray-500 font-[InterTight] text-xs`}>{note.time}</Text>
                                                     )}
                                                 </View>
-                                                {expandedNoteId === note.id && (
-                                                    <Text style={tw`text-white font-[InterTight-Bold] text-lg mb-2`}>{note.title}</Text>
+
+                                                {(expandedNoteId === note.id || editingNoteId === note.id) && (
+                                                    <View style={tw`mb-4`}>
+                                                        {editingNoteId === note.id ? (
+                                                            <TextInput
+                                                                style={tw`text-white font-[InterTight-Bold] text-xl mb-1 p-0`}
+                                                                value={note.title}
+                                                                onChangeText={(text) => setNotes(notes.map(n => n.id === note.id ? { ...n, title: text } : n))}
+                                                                autoFocus
+                                                            />
+                                                        ) : (
+                                                            <Text style={tw`text-white font-[InterTight-Bold] text-xl mb-1`}>{note.title}</Text>
+                                                        )}
+                                                    </View>
                                                 )}
-                                                <Text style={tw`text-gray-400 font-[InterTight] leading-5`}>
-                                                    {note.content}
-                                                </Text>
+
+                                                {editingNoteId === note.id ? (
+                                                    <TextInput
+                                                        style={tw`text-gray-400 font-[InterTight] leading-5 p-0`}
+                                                        value={note.content}
+                                                        onChangeText={(text) => setNotes(notes.map(n => n.id === note.id ? { ...n, content: text } : n))}
+                                                        multiline
+                                                    />
+                                                ) : (
+                                                    <Text style={[
+                                                        tw`text-gray-400 font-[InterTight] leading-5`,
+                                                        expandedNoteId === note.id && tw`text-gray-300 text-base leading-6`
+                                                    ]}>
+                                                        {note.content}
+                                                    </Text>
+                                                )}
                                             </GlassCard>
                                         </TouchableOpacity>
                                     ))}
                                 </ScrollView>
 
-                                <View style={tw`absolute bottom-8 left-8 right-8`}>
+                                <View style={tw`absolute bottom-0 left-0 right-0 bg-[#1C1C1E] px-8 pb-10`}>
+                                    <View style={tw`h-px bg-white/10 w-full mb-6`} />
                                     <TextInput
                                         placeholder="Add a note..."
                                         placeholderTextColor="rgba(255,255,255,0.4)"
                                         style={tw`bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white font-[InterTight]`}
+                                        value={noteInput}
+                                        onChangeText={setNoteInput}
+                                        onSubmitEditing={() => {
+                                            if (noteInput.trim()) {
+                                                setNotes([...notes, {
+                                                    id: Date.now(),
+                                                    title: 'New Note',
+                                                    content: noteInput,
+                                                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                }]);
+                                                setNoteInput('');
+                                            }
+                                        }}
                                     />
                                 </View>
                             </Animated.View>
@@ -547,17 +692,17 @@ export default function DahliaScreen() {
                         <View style={tw`flex-1 justify-end`}>
                             <TouchableOpacity style={tw`flex-1`} onPress={() => setShowSettings(false)} />
                             <View style={[
-                                tw`bg-[#1C1C1E]/95 rounded-t-[40px] border-t border-white/20 p-8 pt-10`,
+                                tw`bg-[#1C1C1E]/95 rounded-t-[40px] border-t border-white/20 pt-10`,
                                 { height: windowHeight * 0.35 }
                             ]}>
-                                <View style={tw`flex-row justify-between items-center mb-8`}>
+                                <View style={tw`flex-row justify-between items-center mb-8 px-8`}>
                                     <Text style={tw`text-white font-[InterTight-Bold] text-2xl`}>Switch Coach</Text>
                                     <TouchableOpacity onPress={() => setShowSettings(false)}>
                                         <X color="#aaa" size={24} />
                                     </TouchableOpacity>
                                 </View>
 
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-4`}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-4 pl-8`}>
                                     {PERSONAS.map(persona => (
                                         <TouchableOpacity
                                             key={persona.id}
@@ -581,6 +726,55 @@ export default function DahliaScreen() {
                                         </TouchableOpacity>
                                     ))}
                                 </ScrollView>
+                            </View>
+                        </View>
+                    </Modal>
+
+                    {/* Text Settings Modal */}
+                    <Modal visible={showTextSettings} transparent animationType="fade">
+                        <View style={tw`flex-1 justify-center items-center bg-black/60 px-6`}>
+                            <View style={tw`bg-[#1C1C1E] border border-white/10 rounded-[32px] p-8 w-full max-w-sm`}>
+                                <View style={tw`flex-row justify-between items-center mb-6`}>
+                                    <Text style={tw`text-white font-[InterTight-Bold] text-xl`}>Text settings</Text>
+                                    <TouchableOpacity onPress={() => setShowTextSettings(false)}>
+                                        <X color="#aaa" size={24} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={tw`gap-4`}>
+                                    {/* Font Selector */}
+                                    <View style={tw`bg-white/5 rounded-2xl p-4 border border-white/10 flex-row justify-between items-center`}>
+                                        <Text style={tw`text-white font-[InterTight]`}>Default</Text>
+                                        <View>
+                                            <ChevronUp color="#888" size={12} />
+                                            <ChevronDown color="#888" size={12} />
+                                        </View>
+                                    </View>
+
+                                    {/* Size Selector */}
+                                    <View style={tw`bg-white/5 rounded-2xl p-4 border border-white/10 flex-row justify-between items-center px-8`}>
+                                        <TouchableOpacity
+                                            onPress={() => setTranscriptionFontSize(Math.max(12, transcriptionFontSize - 2))}
+                                            style={transcriptionFontSize <= 12 ? tw`opacity-30` : tw`opacity-100`}
+                                        >
+                                            <Text style={tw`text-gray-500 font-[InterTight] text-base`}>A-</Text>
+                                        </TouchableOpacity>
+                                        <Text style={tw`text-white font-[InterTight-Bold] text-base`}>A</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setTranscriptionFontSize(Math.min(24, transcriptionFontSize + 2))}
+                                            style={transcriptionFontSize >= 24 ? tw`opacity-30` : tw`opacity-100`}
+                                        >
+                                            <Text style={tw`text-gray-300 font-[InterTight] text-base`}>A+</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={tw`bg-white rounded-2xl py-4 items-center mt-8`}
+                                    onPress={() => setShowTextSettings(false)}
+                                >
+                                    <Text style={tw`text-black font-[InterTight-Bold] text-base`}>Done</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </Modal>

@@ -57,7 +57,7 @@ export default function ProfileScreen() {
                 >
                     {/* Header */}
                     <View style={tw`flex-row items-center justify-between mt-4 mb-8`}>
-                        <Text style={tw`text-white text-3xl font-inter-bold`}>Profile</Text>
+                        <Text style={tw`text-white text-3xl font-[InterTight] font-semibold`}>Profile</Text>
                         <Link href="/settings" asChild>
                             <TouchableOpacity
                                 style={tw`bg-white/10 p-2.5 rounded-xl border border-white/10`}
