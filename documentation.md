@@ -41,3 +41,17 @@
 - Implement actual voice-preview playback functionality for persona selections in the Sign-Up flow.
 - Setup robust frontend-to-backend API wiring for the finalized Sign-Up schema payloads.
 - Continue expanding the onboarding sequence and dashboard transitions.
+
+---
+
+## [Date: 2026-03-08] - Firebase to Supabase Migration
+### Changed
+- Transitioned the entire monorepo architecture from Firebase to Supabase.
+- Configured actual `@supabase/supabase-js` auth listeners in the React Native Expo app replacing mock logic.
+- Installed Supabase client and created an Auth context hook tailored for counselor/admin roles in the Vite Admin Web App.
+- Created highly secure Supabase Service Role client configuration for the Express Backend.
+- Iterated on `README.md` to update all mentions and architecture notes to reflect Supabase (PostgreSQL and Auth).
+
+### Next Steps
+- Implement UI views that directly consume the new Supabase context data.
+- Setup PostgreSQL Row Level Security (RLS) tables in the Supabase dashboard.
