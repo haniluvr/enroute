@@ -53,7 +53,7 @@
 ### Why Enroute? Why now?
 - **Engagement Crisis:** Legacy portals face <15% adoption rates; an app matching consumer aesthetic standards is vital.
 - **Ethical AI Guardrails:** Implementing a distinct RAG pipeline guarantees the AI uses localized data rather than hallucinating generic advice.
-- **Cost Efficiency:** Utilizing Firebase's free tiers and an open-source React Native frontend removes the heavy SaaS licensing associated with enterprise automation.
+- **Cost Efficiency:** Utilizing Supabase's free tiers and an open-source React Native frontend removes the heavy SaaS licensing associated with enterprise automation.
 
 ### Impact
 Cuts job search and roadmap definition time by 50%, reduces career services manual workload by 70%, and positions the institution as a pioneer in human-centered AI EdTech applications.
@@ -140,7 +140,7 @@ This system addresses these gaps through an AI-orchestrated, behaviorally optimi
 **Assumptions**
 - **Project Duration:** 6 months total (2 months planning, 3 months dev, 1 month testing).
 - **Development Model:** Agile methodology with 2-week sprints.
-- **Infrastructure:** Firebase (BaaS) and Render (Node Server) minimizing initial server capital.
+- **Infrastructure:** Supabase (BaaS) and Render (Node Server) minimizing initial server capital.
 - **Open Source Tools:** React Native Expo, React (Vite), Node.js, Express.
 - **Contingency:** 15% buffer for changing AI API costs.
 - **Exchange Rates:** PHP 58 = USD 1.
@@ -157,7 +157,7 @@ This system addresses these gaps through an AI-orchestrated, behaviorally optimi
 | Item | License Type | Cost |
 |---|---|---|
 | React Native / Node.js | Open Source | Php 0.00 |
-| Firebase (Spark Plan) | Free Tier | Php 0.00 |
+| Supabase (Free Plan) | Free Tier | Php 0.00 |
 | GitHub Student Pack | Free for Students | Php 0.00 |
 | Figma for Education | Free for Students | Php 0.00 |
 | Apple Developer Program | Annual | Php 5,742.00 |
@@ -187,7 +187,7 @@ Enroute is a student-centered mobile application designed to bridge the gap betw
 | **Mobile Frontend** | React Native (Expo) + Tailwind | High (Cross-platform standard) |
 | **Web Frontend** | React.js (Vite) | High |
 | **Backend** | Node.js + Express | High |
-| **Database** | Firebase Firestore | High (Real-time sync capabilities) |
+| **Database** | Supabase PostgreSQL | High (Real-time sync capabilities) |
 | **AI Engine** | RAG via Node.js + OpenAI APIs | Medium (Requires dedicated prompt engineering) |
 
 **Technical Risks & Mitigation**
@@ -198,7 +198,7 @@ Enroute is a student-centered mobile application designed to bridge the gap betw
 Pre-survey data shows 92% student interest in aesthetically modern, swipe-based interfaces over traditional board layouts. The introduction of "Dahlia" as a conversational partner removes the intimidation factor of traditional counseling.
 
 **Conclusion:**
-Enroute demonstrates strong feasibility. The hybrid tech stack (Firebase + Node/Express) perfectly balances the need for rapid real-time mobile syncing with the heavy processing required for AI RAG pipelines.
+Enroute demonstrates strong feasibility. The hybrid tech stack (Supabase + Node/Express) perfectly balances the need for rapid real-time mobile syncing with the heavy processing required for AI RAG pipelines.
 
 <br><br><br>
 
@@ -228,7 +228,7 @@ The justification for developing "Enroute" emerges from these imperatives. By em
 - **For Institutions:** Generates auditable graduate employability metrics required for CHED program accreditation and establishes a replicable framework for mobile EdTech infrastructure.
 
 **Scope and Delimitations**
-- **Scope:** The system encompasses a cross-platform mobile application built in React Native Expo, a React Vite administrative web dashboard, and a Node.js Express backend acting as the bridge for the Dahlia AI integration. Authentication and core data syncing rely on Firebase. Features include voice-to-text chat, swipeable cards, roadmap generation, and automated announcements.
+- **Scope:** The system encompasses a cross-platform mobile application built in React Native Expo, a React Vite administrative web dashboard, and a Node.js Express backend acting as the bridge for the Dahlia AI integration. Authentication and core data syncing rely on Supabase. Features include voice-to-text chat, swipeable cards, roadmap generation, and automated announcements.
 - **Delimitations:** The system will not process financial transactions for external certifications, nor will it serve as a finalized job-application submission portal (it routes users outward). Deep model fine-tuning of base LLMs (like training Llama 3 from scratch) is excluded; the AI relies on prompt-engineering and Retrieval-Augmented Generation using existing foundational models via API.
 
 <br><br><br>
@@ -240,7 +240,7 @@ The justification for developing "Enroute" emerges from these imperatives. By em
 ### SWOT Analysis Matrix
 | Strengths | Weaknesses |
 |---|---|
-| - Bespoke "Vibe-Coded" mobile UI commands high user retention.<br>- Hybrid Firebase/Node architecture allows for rapid MVP iteration.<br>- RAG integration prevents AI hallucinations. | - High reliance on internet connectivity for real-time AI API queries.<br>- Recurring operational costs scaling directly with AI token usage. |
+| - Bespoke "Vibe-Coded" mobile UI commands high user retention.<br>- Hybrid Supabase/Node architecture allows for rapid MVP iteration.<br>- RAG integration prevents AI hallucinations. | - High reliance on internet connectivity for real-time AI API queries.<br>- Recurring operational costs scaling directly with AI token usage. |
 | **Opportunities** | **Threats** |
 | - Expansion of the Admin Web portal into a SaaS licensing model for other universities.<br>- Establishing a standardized pipeline matching local students to DOLE initiatives automatically. | - Strict scrutiny and potential friction from the National Privacy Commission regarding CV and Audio data processing.<br>- Rapid shifts in the React Native / Expo ecosystem requiring frequent maintenance. |
 
@@ -254,7 +254,7 @@ The justification for developing "Enroute" emerges from these imperatives. By em
 - **Intangible Value:** Substantially increase student peace of mind and trust in institutional support by providing a modern, empathetic digital interface they actually want to engage with.
 
 ### Special Issue
-- **Mandatory Compliance with Republic Act No. 10173 (Data Privacy Act of 2012):** Because the Enroute backend explicitly handles and parses sensitive student documents (CVs) and personal voice data to power the Dahlia AI, the architecture must include strict auto-anonymization cron jobs, explicitly separated consent logic before sending data to external API providers, and rigorous Firebase Storage routing to prevent unauthorized data exposure.
+- **Mandatory Compliance with Republic Act No. 10173 (Data Privacy Act of 2012):** Because the Enroute backend explicitly handles and parses sensitive student documents (CVs) and personal voice data to power the Dahlia AI, the architecture must include strict auto-anonymization cron jobs, explicitly separated consent logic before sending data to external API providers, and rigorous Supabase Storage routing to prevent unauthorized data exposure.
 
 ---
 

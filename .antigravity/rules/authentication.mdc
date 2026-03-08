@@ -1,21 +1,21 @@
-# Authentication Flow (Firebase)
+# Authentication Flow (Supabase)
 
-We use Firebase Auth to completely eliminate the need for rolling our own secure authentication, allowing us to ship faster.
+We use Supabase Auth to completely eliminate the need for rolling our own secure authentication, allowing us to ship faster.
 
 ## Mobile (Expo) & Web (Admin) Shared Flow
 1. **Email / Password**: Primary login method.
-2. **Session Persistence**: Firebase handles token refreshing automatically on both React Native and web.
+2. **Session Persistence**: Supabase handles token refreshing automatically on both React Native and web via standard `onAuthStateChange` listeners.
 3. **Role-Based Access Control (RBAC)**:
-   - Since Firebase Auth doesn't have native "roles" easily queryable on the client without custom claims, we store the user's role in the `users` Firestore collection: `{ role: 'student' }`.
-   - **Custom Claims (Optional for Backend)**: If you implement the Express backend, use Firebase Admin to set custom claims (`admin`, `mentor`) on the user token for secure backend validation.
+   - Store the user's role in a `public.profiles` or `public.users` table joined to the `auth.users` ID: `{ role: 'student' }`.
+   - Setup Row Level Security (RLS) policies based on this role.
 
 ## Securing the Express Backend
 When the client needs to talk to the Node/Express backend for AI or heavy logic:
-1. Client gets the current user's ID token: `auth.currentUser.getIdToken()`.
+1. Client gets the current user's session token: `(await supabase.auth.getSession()).data.session?.access_token`.
 2. Client sends it in the `Authorization` header: `Bearer <TOKEN>`.
-3. Express uses `firebase-admin.auth().verifyIdToken(token)` to validate the request.
+3. Express parses the JWT or uses `supabase.auth.getUser(token)` to validate the request.
 
 ## Rules
 - Never store raw passwords.
-- Always implement loading states while Firebase restores the auth session on app boot.
+- Always implement loading states while Supabase restores the auth session on app boot.
 - Restrict Admin Web Portal routes to users where `role === 'admin'` or `role === 'mentor'`.

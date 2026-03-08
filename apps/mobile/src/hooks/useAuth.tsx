@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth'; // Will be real later
-import { auth } from '../config/firebase';
+import { User } from '@supabase/supabase-js'; // Will be real later
+import { supabase } from '../config/supabase';
 
 interface AuthContextType {
     user: User | null;
@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isCounselor, setIsCounselor] = useState(false);
 
     useEffect(() => {
-        // Placeholder for actual firebase auth listener
+        // Placeholder for actual Supabase auth listener
         // Instantly bypass loading state for UI testing
         setUser(null);
         setIsLoading(false);
