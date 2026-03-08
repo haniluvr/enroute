@@ -60,13 +60,15 @@ export default function TabLayout() {
                         fontWeight: '500',
                     },
                     tabBarStyle: {
-                        backgroundColor: '#111111',
-                        borderTopWidth: 1,
-                        borderTopColor: 'rgba(255,255,255,0.05)',
+                        position: 'absolute',
+                        backgroundColor: 'transparent',
+                        borderTopWidth: 0,
+                        borderTopColor: 'transparent',
                         height: 70,
                         paddingBottom: 10,
                         elevation: 0,
                         shadowOpacity: 0,
+                        borderBottomWidth: 0,
                     },
                 }}
             >

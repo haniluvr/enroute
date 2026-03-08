@@ -36,17 +36,17 @@ export function PathCard({ item }: PathCardProps) {
                     </View>
                 </View>
 
-                <Text style={tw`text-white font-[InterTight-SemiBold] text-base mb-1`} numberOfLines={1}>
+                <Text style={tw`text-white font-[InterTight] font-medium text-lg mb-1`} numberOfLines={1}>
                     {item.title}
                 </Text>
-                <Text style={tw`text-gray-400 font-[InterTight] text-sm mb-3`} numberOfLines={2}>
+                <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-3`} numberOfLines={2}>
                     {item.description}
                 </Text>
 
                 <View style={tw`bg-white/5 rounded-xl px-4 py-2.5 mt-1`}>
                     <View style={tw`flex-row items-center`}>
                         <Calendar color="#888" size={14} style={tw`mr-1.5`} />
-                        <Text style={tw`text-gray-500 font-[InterTight] text-xs`}>
+                        <Text style={tw`text-gray-500 font-[InterTight] text-sm`}>
                             Last updated: {item.lastUpdated}
                         </Text>
                     </View>

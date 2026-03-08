@@ -59,13 +59,13 @@ export default function CareerDetailsScreen() {
                     </TouchableOpacity>
 
                     {/* Header */}
-                    <Text style={tw`text-white font-[InterTight-Bold] text-2xl mb-2`}>
+                    <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-2`}>
                         Career details
                     </Text>
-                    <Text style={tw`text-gray-400 font-[InterTight] text-base mb-4`}>
+                    <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-4`}>
                         Learn, practice, and grow with resources tailored for this role
                     </Text>
-                    <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-8`}>
+                    <Text style={tw`text-gray-300 font-[InterTight] font-medium text-lg mb-8`}>
                         Becoming a {career.title}
                     </Text>
 
@@ -79,32 +79,32 @@ export default function CareerDetailsScreen() {
                                 </Text>
                             </View>
                         </View>
-                        <Text style={tw`text-white font-[InterTight-SemiBold] text-base mb-2`}>
+                        <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg mb-2`}>
                             What you need to learn:
                         </Text>
-                        <View style={tw`mb-4`}>
+                        <View style={tw`mb-4 pl-2`}>
                             {career.learnItems.map((item, i) => (
-                                <Text key={i} style={tw`text-gray-400 font-[InterTight] text-sm mb-1`}>
+                                <Text key={i} style={tw`text-white font-[InterTight] text-lg mb-1`}>
                                     • {item}
                                 </Text>
                             ))}
                         </View>
                         <View style={tw`bg-white/5 rounded-xl p-4`}>
                             <View style={tw`flex-row items-center mb-2`}>
-                                <Lightbulb color="#FF9500" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                <Lightbulb color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
                                     Job Demand: {career.jobDemand}
                                 </Text>
                             </View>
                             <View style={tw`flex-row items-center mb-2`}>
-                                <IconComponent color="#FF9500" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                <IconComponent color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
                                     Avg Salary: {career.avgSalary}
                                 </Text>
                             </View>
                             <View style={tw`flex-row items-center`}>
-                                <Calendar color="#FF9500" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                <Calendar color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
                                     Est time to complete: {career.estTimeToComplete}
                                 </Text>
                             </View>
@@ -125,11 +125,11 @@ export default function CareerDetailsScreen() {
                         {/* PDFs */}
                         {career.pdfs.length > 0 && (
                             <>
-                                <Text style={tw`text-white font-[InterTight-SemiBold] text-sm mb-3`}>PDFs</Text>
+                                <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-3`}>PDFs</Text>
                                 {career.pdfs.map((pdf, i) => (
                                     <View key={pdf.id}>
-                                        <View style={tw`flex-row justify-between items-center mb-1`}>
-                                            <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                        <View style={tw`flex-row justify-between items-center`}>
+                                            <Text style={tw`text-gray-300 font-[InterTight] text-base`}>
                                                 {pdf.name}
                                             </Text>
                                             <TouchableOpacity style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center`}>
@@ -137,7 +137,7 @@ export default function CareerDetailsScreen() {
                                             </TouchableOpacity>
                                         </View>
                                         {pdf.fileSize && (
-                                            <Text style={tw`text-gray-500 font-[InterTight] text-xs mb-3`}>
+                                            <Text style={tw`text-gray-500 font-[InterTight] text-sm mb-3`}>
                                                 {pdf.fileSize}
                                             </Text>
                                         )}
@@ -153,14 +153,14 @@ export default function CareerDetailsScreen() {
                         {/* Videos */}
                         {career.videos.length > 0 && (
                             <>
-                                <Text style={tw`text-white font-[InterTight-SemiBold] text-sm mb-3`}>Videos</Text>
+                                <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-3`}>Videos</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-4`}>
                                     {career.videos.map((video) => (
                                         <View
                                             key={video.id}
-                                            style={tw`w-36 h-24 bg-white/10 rounded-xl mr-3 p-3 justify-end`}
+                                            style={tw`w-62 h-42 bg-white/10 rounded-xl mr-3 p-3 justify-end`}
                                         >
-                                            <Text style={tw`text-white font-[InterTight-Medium] text-xs`} numberOfLines={1}>
+                                            <Text style={tw`text-white font-[InterTight-Medium] text-sm`} numberOfLines={1}>
                                                 {video.name}
                                             </Text>
                                             <Text style={tw`text-gray-500 font-[InterTight] text-xs`}>
@@ -176,11 +176,11 @@ export default function CareerDetailsScreen() {
                         {/* Articles & Tools */}
                         {career.articles.length > 0 && (
                             <>
-                                <Text style={tw`text-white font-[InterTight-SemiBold] text-sm mb-3`}>Articles & Tools</Text>
+                                <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-3`}>Articles & Tools</Text>
                                 {career.articles.map((article, i) => (
                                     <View key={article.id}>
                                         <View style={tw`flex-row justify-between items-center mb-1`}>
-                                            <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                            <Text style={tw`text-gray-300 font-[InterTight] text-base`}>
                                                 {article.name}
                                             </Text>
                                             <TouchableOpacity style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center`}>
@@ -199,20 +199,20 @@ export default function CareerDetailsScreen() {
                         {/* Counts */}
                         <View style={tw`bg-white/5 rounded-xl p-4`}>
                             <View style={tw`flex-row items-center mb-2`}>
-                                <FileText color="#EAB308" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                <FileText color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>
                                     PDFs: {career.pdfs.length}
                                 </Text>
                             </View>
                             <View style={tw`flex-row items-center mb-2`}>
-                                <Video color="#EAB308" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                <Video color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>
                                     Videos: {career.videos.length}
                                 </Text>
                             </View>
                             <View style={tw`flex-row items-center`}>
-                                <Wrench color="#EAB308" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
+                                <Wrench color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>
                                     Articles & Tools: {career.articles.length}
                                 </Text>
                             </View>
@@ -227,7 +227,7 @@ export default function CareerDetailsScreen() {
                                     Reviews ({career.reviews.length})
                                 </Text>
                                 <TouchableOpacity style={tw`flex-row items-center`}>
-                                    <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>See all</Text>
+                                    <Text style={tw`text-gray-300 font-[InterTight] text-base`}>See all</Text>
                                     <ChevronRight color="#888" size={18} style={tw`ml-1`} />
                                 </TouchableOpacity>
                             </View>
@@ -240,12 +240,12 @@ export default function CareerDetailsScreen() {
                                             <View style={tw`flex-row justify-between items-start`}>
                                                 <View style={tw`flex-row`}>
                                                     <View style={tw`w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-3`}>
-                                                        <Text style={tw`text-white font-[InterTight-SemiBold] text-sm`}>
+                                                        <Text style={tw`text-white font-[InterTight-SemiBold] text-base`}>
                                                             {review.authorName.charAt(0)}
                                                         </Text>
                                                     </View>
                                                     <View>
-                                                        <Text style={tw`text-white font-[InterTight-Medium] text-sm`}>
+                                                        <Text style={tw`text-white font-[InterTight-Medium] text-base`}>
                                                             {review.authorName}
                                                         </Text>
                                                         <View style={tw`flex-row items-center mt-1`}>

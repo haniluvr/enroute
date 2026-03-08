@@ -11,7 +11,7 @@ export default function HomeScreen() {
     const router = useRouter();
 
     // Fallback names for now since Firebase isn't live
-    const displayName = user?.displayName || 'Akin';
+    const displayName = user?.displayName || 'Hana';
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
@@ -69,19 +69,19 @@ export default function HomeScreen() {
                         <TouchableOpacity
                             style={tw`w-[48%]`}
                             activeOpacity={0.8}
-                            onPress={() => router.push('/(tabs)/explore')}
+                            onPress={() => router.push('/career-interest-test')}
                         >
                             <GlassCard style={tw`h-[140px] p-5 justify-between bg-white/10 shadow-xl border-t border-white/20`} noPadding>
                                 <View style={tw`bg-[#fcfcfc]/20 w-11 h-11 rounded-2xl items-center justify-center`}>
                                     <Telescope color="#fff" size={22} />
                                 </View>
-                                <Text style={tw`text-white font-[InterTight-Medium] text-[15px]`}>Explore careers</Text>
+                                <Text style={tw`text-white font-[InterTight-Medium] text-[15px]`}>Career Interest Test</Text>
                             </GlassCard>
                         </TouchableOpacity>
                     </View>
 
                     <View style={tw`flex-row justify-between`}>
-                        {/* Card 3: View Roadmap */}
+                        {/* Card 3: Build Roadmap */}
                         <TouchableOpacity
                             style={tw`w-[48%]`}
                             activeOpacity={0.8}
@@ -91,7 +91,7 @@ export default function HomeScreen() {
                                 <View style={tw`bg-[#fcfcfc]/20 w-11 h-11 rounded-2xl items-center justify-center`}>
                                     <MapPlus color="#fff" size={22} />
                                 </View>
-                                <Text style={tw`text-white font-[InterTight-Medium] text-[15px]`}>View roadmap</Text>
+                                <Text style={tw`text-white font-[InterTight-Medium] text-[15px]`}>Build roadmap</Text>
                             </GlassCard>
                         </TouchableOpacity>
 
