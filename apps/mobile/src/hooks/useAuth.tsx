@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth'; // Will be real later
-import { auth } from '../config/firebase';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '../config/supabase';
 
 interface AuthContextType {
     user: User | null;
@@ -20,10 +20,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isCounselor, setIsCounselor] = useState(false);
 
     useEffect(() => {
-        // Placeholder for actual firebase auth listener
-        // Instantly bypass loading state for UI testing
-        setUser(null);
-        setIsLoading(false);
+        // Fetch initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
+            setIsLoading(false);
+            // In a real app, you would check the user's role here
+            setIsCounselor(session?.user?.user_metadata?.role === 'counselor');
+        });
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+            setIsLoading(false);
+            setIsCounselor(session?.user?.user_metadata?.role === 'counselor');
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
     return (

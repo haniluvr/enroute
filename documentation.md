@@ -7,7 +7,7 @@
 ## [Date: 2026-03-03] - Planning Phase Complete
 ### Added
 - Created comprehensive `.mdc` workflow rules tailored to the "Enroute" platform and Dahlia AI.
-- Finalized Hybrid Architecture: React Native Expo (Mobile), React Vite (Admin), Node.js/Express (Heavy Backend API), and Firebase (Auth, Storage, Real-time DB).
+- Finalized Hybrid Architecture: React Native Expo (Mobile), React Vite (Admin), Node.js/Express (Heavy Backend API), and Supabase (Auth, Storage, PostgreSQL).
 - Established `documentation.md` tracker to fulfill custom user requirements.
 - Standardized UI/UX rules (dark mode, neon vibrant colors) in `frontend-styling.mdc`.
 - **Scaffolded full monorepo**: Initialized `apps/mobile`, `apps/web`, `apps/admin-web`, and `apps/backend`.

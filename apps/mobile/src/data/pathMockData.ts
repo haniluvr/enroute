@@ -1,5 +1,5 @@
 /**
- * Path module mock data - ready for Firebase replacement.
+ * Path module mock data - ready for Supabase replacement.
  * Structure matches types/path.ts for easy migration.
  */
 

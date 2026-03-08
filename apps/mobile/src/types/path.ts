@@ -1,6 +1,6 @@
 /**
- * Path module types - structured for Firebase integration.
- * Swap pathMockData for Firebase queries when ready.
+ * Path module types - structured for Supabase integration.
+ * Swap pathMockData for Supabase queries when ready.
  */
 
 export interface PathCard {
