@@ -7,6 +7,7 @@ import { GlassBackground } from '@/components/GlassBackground';
 import { Modal } from 'react-native';
 import { BlurView } from 'expo-blur';
 import LottieView from 'lottie-react-native';
+import { useAuth } from '@/hooks/useAuth';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -23,6 +24,8 @@ export default function SignInScreen() {
     // Animated modal values
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const cardTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+    const { signIn } = useAuth();
 
     useEffect(() => {
         if (showSuccessModal) {
@@ -58,9 +61,9 @@ export default function SignInScreen() {
         }, 1500);
     };
 
-    const handleModalClose = () => {
+    const handleModalClose = async () => {
         setShowSuccessModal(false);
-        router.replace('/(tabs)/home');
+        await signIn(email || 'admin@enroute.dev');
     };
 
     return (
@@ -198,7 +201,7 @@ export default function SignInScreen() {
 
                             {/* Title and Text */}
                             <Text style={tw`text-3xl text-white font-[InterTight] font-medium mt-8 mb-2 text-center`}>
-                                Welcome, {email ? email.split('@')[0] : 'admin'}!
+                                Welcome, {email ? email.split('@')[0] : 'Hana'}!
                             </Text>
                             <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-5 mb-4 px-2`}>
                                 Ask questions, get career roadmaps,{'\n'}and explore resources

@@ -6,9 +6,14 @@ import {
     ScrollView,
     StyleSheet,
     Dimensions,
-    ActivityIndicator
+    ActivityIndicator,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
+    Keyboard
 } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
+import { GlassCard } from '@/components/GlassCard';
 import { useRouter } from 'expo-router';
 import {
     ChevronLeft,
@@ -17,36 +22,60 @@ import {
     RotateCcw,
     Sparkles,
     Save,
-    Clock,
-    MoreVertical,
-    Play
+    Send,
+    Play,
+    Pause,
+    Circle,
+    User,
+    ArrowRight
 } from 'lucide-react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withRepeat,
     withTiming,
-    withDelay,
-    FadeIn
+    withSpring,
+    FadeIn,
+    FadeOut,
+    SlideInDown,
+    Layout
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-type FlowState = 'IDLE' | 'RECORDING' | 'PROCESSING' | 'REPLY';
+type Message = {
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+};
+
+type FlowState = 'IDLE' | 'RECORDING' | 'PROCESSING' | 'REFINE';
 
 export default function RecordIdeaScreen() {
     const router = useRouter();
     const [state, setState] = useState<FlowState>('IDLE');
     const [seconds, setSeconds] = useState(0);
+    const [transcription, setTranscription] = useState("I'm thinking about transitioning into UI Engineering. I have a strong background in backend development but I've always been more interested in the visual and interactive side of things. I want to build premium experiences.");
+    const [messages, setMessages] = useState<Message[]>([
+        {
+            role: 'assistant',
+            content: "That's a bold and exciting move! Transitioning from backend to UI Engineering gives you a unique edge in understanding how data flows into interfaces. What specific areas of UI (animations, design systems, accessibility) excite you the most?",
+            timestamp: new Date()
+        }
+    ]);
+    const [inputText, setInputText] = useState('');
+    const scrollViewRef = useRef<ScrollView>(null);
 
     // Pulse animation for recording
     const pulse = useSharedValue(1);
+    const micScale = useSharedValue(1);
 
     useEffect(() => {
         if (state === 'RECORDING') {
             pulse.value = withRepeat(
-                withTiming(1.5, { duration: 1000 }),
+                withTiming(1.6, { duration: 1200 }),
                 -1,
                 true
             );
@@ -61,11 +90,11 @@ export default function RecordIdeaScreen() {
         }
     }, [state]);
 
-    // Mock processing timer
+    // Mock processing transition
     useEffect(() => {
         if (state === 'PROCESSING') {
             const timer = setTimeout(() => {
-                setState('REPLY');
+                setState('REFINE');
             }, 3000);
             return () => clearTimeout(timer);
         }
@@ -73,7 +102,7 @@ export default function RecordIdeaScreen() {
 
     const animatedPulseStyle = useAnimatedStyle(() => ({
         transform: [{ scale: pulse.value }],
-        opacity: 0.5 - (pulse.value - 1) * 0.5,
+        opacity: withTiming(state === 'RECORDING' ? 0.3 : 0, { duration: 500 }),
     }));
 
     const formatTime = (totalSeconds: number) => {
@@ -82,148 +111,193 @@ export default function RecordIdeaScreen() {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const renderHeader = (title: string, subtitle: string) => (
-        <View style={tw`px-6 pt-16 pb-6`}>
+    const handleSendMessage = () => {
+        if (!inputText.trim()) return;
+
+        const newMessage: Message = {
+            role: 'user',
+            content: inputText,
+            timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, newMessage]);
+        setInputText('');
+        Keyboard.dismiss();
+
+        // Mock AI response
+        setTimeout(() => {
+            const aiResponse: Message = {
+                role: 'assistant',
+                content: "Focusing on premium experiences is a high-value niche. You should definitely look into Framer Motion and React Native Reanimated. Since you have a backend background, you can also specialize in 'Full-stack UI'—optimizing the bridge between APIs and fluid interactions.",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiResponse]);
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 1000);
+    };
+
+    const renderHeader = () => (
+        <View style={tw`px-6 pt-16 pb-4 flex-row items-center justify-between`}>
             <TouchableOpacity
                 onPress={() => state === 'IDLE' ? router.back() : setState('IDLE')}
-                style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-6`}
+                style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
+                activeOpacity={0.7}
             >
-                <ChevronLeft color="#ffffff" size={24} />
+                <ChevronLeft color="#fff" size={24} />
             </TouchableOpacity>
-            <Text style={tw`text-white font-[InterTight-Bold] text-2xl mb-1`}>{title}</Text>
-            <Text style={tw`text-gray-400 font-[InterTight] text-[15px]`}>{subtitle}</Text>
+
+            <View style={tw`items-center`}>
+                <Text style={tw`text-white font-[InterTight-Bold] text-lg`}>
+                    {state === 'IDLE' ? "Record Idea" :
+                        state === 'RECORDING' ? "Recording" :
+                            state === 'PROCESSING' ? "Analyzing" : "Refine Idea"}
+                </Text>
+                {state === 'RECORDING' && (
+                    <Text style={tw`text-accent-violet font-[InterTight-Medium] text-xs`}>{formatTime(seconds)}</Text>
+                )}
+            </View>
+
+            <TouchableOpacity
+                style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
+                activeOpacity={0.7}
+            >
+                <RotateCcw color="#fff" size={20} />
+            </TouchableOpacity>
         </View>
     );
 
     return (
-        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
-            <ScrollView
-                style={tw`flex-1`}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={tw`pb-32`}
-            >
-                {state === 'IDLE' && renderHeader("Record Idea", "Transcribe and summarize your thoughts.")}
-                {state === 'RECORDING' && renderHeader("Recording...", "Capturing your career ideas.")}
-                {state === 'PROCESSING' && renderHeader("Processing", "Generating AI summary...")}
-                {state === 'REPLY' && renderHeader("AI Summary", "Here's the takeaway from your recording.")}
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={tw`flex-1`}
+        >
+            <GlassBackground locations={[0.0, 0.1, 0.3, 0.7]}>
+                {renderHeader()}
 
-                <View style={tw`px-6 items-center`}>
-                    {/* Interaction Visual Area */}
-                    <View style={tw`h-80 w-full bg-white/5 border border-white/10 rounded-3xl overflow-hidden mb-12 justify-center items-center`}>
-                        {state === 'IDLE' && (
-                            <TouchableOpacity
-                                onPress={() => { setSeconds(0); setState('RECORDING'); }}
-                                style={tw`w-24 h-24 rounded-full bg-accent-violet items-center justify-center shadow-2xl shadow-accent-violet`}
-                            >
-                                <Mic color="#fff" size={40} />
-                            </TouchableOpacity>
-                        )}
-
-                        {state === 'RECORDING' && (
-                            <View style={tw`items-center justify-center`}>
-                                <Animated.View style={[tw`absolute w-32 h-32 rounded-full bg-accent-violet/30`, animatedPulseStyle]} />
-                                <TouchableOpacity
-                                    onPress={() => setState('PROCESSING')}
-                                    style={tw`w-24 h-24 rounded-full bg-accent-violet items-center justify-center z-10`}
-                                >
-                                    <Square color="#fff" size={32} fill="#fff" />
-                                </TouchableOpacity>
-                                <Text style={tw`text-white font-[InterTight-Medium] text-2xl mt-8`}>{formatTime(seconds)}</Text>
-                            </View>
-                        )}
-
-                        {state === 'PROCESSING' && (
-                            <View style={tw`items-center`}>
-                                <ActivityIndicator color="#8b5cf6" size="large" />
-                                <Text style={tw`text-gray-400 font-[InterTight] mt-6`}>AI is analyzing your voice...</Text>
-                            </View>
-                        )}
-
-                        {state === 'REPLY' && (
-                            <View style={tw`w-full h-full p-6 justify-center`}>
-                                <View style={tw`flex-row items-center mb-4`}>
-                                    <View style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center mr-3`}>
-                                        <Play color="#fff" size={16} fill="#fff" />
-                                    </View>
-                                    <View style={tw`flex-1 h-1 bg-white/10 rounded-full overflow-hidden`}>
-                                        <View style={tw`w-1/3 h-full bg-white`} />
-                                    </View>
-                                    <Text style={tw`text-gray-400 text-xs ml-3`}>{formatTime(seconds)}</Text>
-                                </View>
-                                <View style={tw`bg-white/5 border border-white/10 rounded-2xl p-4`}>
-                                    <View style={tw`flex-row justify-between items-center mb-3`}>
-                                        <View style={tw`flex-row items-center`}>
-                                            <Sparkles color="#8b5cf6" size={16} style={tw`mr-2`} />
-                                            <Text style={tw`text-accent-violet font-[InterTight-SemiBold]`}>Key Insights</Text>
+                {state !== 'REFINE' ? (
+                    <View style={tw`flex-1 px-6 justify-center items-center`}>
+                        {/* Recording Visualization Area */}
+                        <View style={tw`w-full h-80 items-center justify-center`}>
+                            {state === 'IDLE' && (
+                                <Animated.View entering={FadeIn.duration(800)} style={tw`items-center`}>
+                                    <TouchableOpacity
+                                        onPress={() => { setSeconds(0); setState('RECORDING'); }}
+                                        activeOpacity={0.8}
+                                        onPressIn={() => micScale.value = withSpring(0.9)}
+                                        onPressOut={() => micScale.value = withSpring(1)}
+                                        style={tw`w-28 h-28 rounded-full bg-white/10 border border-white/20 items-center justify-center shadow-2xl`}
+                                    >
+                                        <View style={tw`w-20 h-20 rounded-full bg-accent-violet items-center justify-center`}>
+                                            <Mic color="#fff" size={38} />
                                         </View>
-                                        <TouchableOpacity>
-                                            <MoreVertical color="#fff" size={16} />
-                                        </TouchableOpacity>
-                                    </View>
-                                    <Text style={tw`text-white font-[InterTight] leading-5 text-[15px]`}>
-                                        You discussed your interest in transitioning to UI engineering. Key points include your background in API integration and your goal to master Framer Motion for premium animations.
+                                    </TouchableOpacity>
+                                    <Text style={tw`text-white font-[InterTight-SemiBold] text-2xl mt-8 mb-2`}>Tap to start</Text>
+                                    <Text style={tw`text-gray-400 font-[InterTight] text-[15px] text-center px-8`}>
+                                        Speak naturally about your goals, questions, or random career sparks.
                                     </Text>
+                                </Animated.View>
+                            )}
+
+                            {state === 'RECORDING' && (
+                                <View style={tw`items-center justify-center`}>
+                                    <Animated.View style={[tw`absolute w-48 h-48 rounded-full bg-accent-violet/20`, animatedPulseStyle]} />
+                                    <Animated.View style={[tw`absolute w-64 h-64 rounded-full bg-accent-violet/10`, animatedPulseStyle]} />
+                                    <TouchableOpacity
+                                        onPress={() => setState('PROCESSING')}
+                                        style={tw`w-28 h-28 rounded-full bg-white items-center justify-center z-10 shadow-xl shadow-accent-violet/50`}
+                                    >
+                                        <Square color="#8b5cf6" size={32} fill="#8b5cf6" />
+                                    </TouchableOpacity>
+                                    <Text style={tw`text-white font-[InterTight-Medium] text-[17px] mt-12 opacity-60`}>Listening to your thoughts...</Text>
                                 </View>
-                            </View>
-                        )}
+                            )}
+
+                            {state === 'PROCESSING' && (
+                                <Animated.View entering={FadeIn} style={tw`items-center`}>
+                                    <ActivityIndicator color="#8b5cf6" size="large" />
+                                    <Text style={tw`text-white font-[InterTight-Medium] text-xl mt-8`}>Dahlia is thinking...</Text>
+                                    <Text style={tw`text-gray-400 font-[InterTight] mt-2`}>Synthesizing your career insights</Text>
+                                </Animated.View>
+                            )}
+                        </View>
                     </View>
-
-                    {/* Footer State UI */}
-                    {state === 'IDLE' && (
-                        <View style={tw`items-center`}>
-                            <Text style={tw`text-white font-[InterTight-Medium] text-lg mb-2`}>Tap to start recording</Text>
-                            <Text style={tw`text-gray-400 font-[InterTight] text-center px-4`}>
-                                Describe your career thoughts, interview answers, or random ideas. We'll transcribe and summarize it for your library.
-                            </Text>
-                        </View>
-                    )}
-
-                    {state === 'RECORDING' && (
-                        <TouchableOpacity
-                            onPress={() => { setState('IDLE'); setSeconds(0); }}
-                            style={tw`flex-row items-center bg-white/5 border border-white/10 px-6 py-3 rounded-full`}
+                ) : (
+                    <View style={tw`flex-1`}>
+                        <ScrollView
+                            ref={scrollViewRef}
+                            style={tw`flex-1`}
+                            contentContainerStyle={tw`px-6 pb-32 pt-4`}
+                            showsVerticalScrollIndicator={false}
                         >
-                            <RotateCcw color="#fff" size={18} style={tw`mr-2`} />
-                            <Text style={tw`text-white font-[InterTight-Medium]`}>Reset & Restart</Text>
-                        </TouchableOpacity>
-                    )}
+                            {/* Transcription Header Card */}
+                            <Animated.View entering={SlideInDown.duration(600)} style={tw`mb-8`}>
+                                <GlassCard style={tw`bg-white/10 border-white/20 p-6`} noPadding>
+                                    <View style={tw`flex-row items-center mb-4`}>
+                                        <View style={tw`w-8 h-8 rounded-full bg-accent-violet/20 items-center justify-center mr-3`}>
+                                            <Sparkles color="#8b5cf6" size={16} />
+                                        </View>
+                                        <Text style={tw`text-white font-[InterTight-SemiBold] text-base`}>Original Thought</Text>
+                                    </View>
+                                    <Text style={tw`text-gray-200 font-[InterTight] text-[15px] leading-6 italic`}>
+                                        "{transcription}"
+                                    </Text>
+                                </GlassCard>
+                            </Animated.View>
 
-                    {state === 'REPLY' && (
-                        <View style={tw`w-full gap-4`}>
-                            <View style={tw`bg-white/5 border-l-4 border-accent-violet p-4 rounded-r-2xl`}>
-                                <Text style={tw`text-gray-300 font-[InterTight] text-sm`}>
-                                    "I want to focus more on mobile animations and premium UI interactions..."
-                                </Text>
-                            </View>
-
-                            <View style={tw`flex-row space-x-3 mt-4`}>
-                                <TouchableOpacity
-                                    style={tw`flex-1 bg-white py-4 rounded-full items-center justify-center flex-row shadow-xl`}
+                            {/* Chat Messages */}
+                            {messages.map((msg, index) => (
+                                <Animated.View
+                                    key={index}
+                                    entering={FadeIn.delay(index * 100)}
+                                    layout={Layout.springify()}
+                                    style={tw`mb-6 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                                 >
-                                    <Save color="#000" size={18} style={tw`mr-2`} />
-                                    <Text style={tw`text-black text-lg font-[InterTight-SemiBold]`}>Save Note</Text>
-                                </TouchableOpacity>
+                                    <View style={tw`flex-row ${msg.role === 'user' ? 'flex-row-reverse' : ''} max-w-[85%]`}>
+                                        <View style={tw`w-8 h-8 rounded-full items-center justify-center ${msg.role === 'user' ? 'bg-white/20 ml-3' : 'bg-accent-violet mt-1 mr-3'}`}>
+                                            {msg.role === 'user' ? <User color="#fff" size={16} /> : <Sparkles color="#fff" size={16} />}
+                                        </View>
+                                        <View style={tw`p-4 rounded-2xl ${msg.role === 'assistant' ? 'bg-white/5 border border-white/10 rounded-tl-none' : 'bg-accent-violet rounded-tr-none'}`}>
+                                            <Text style={tw`text-white font-[InterTight] text-[15px] leading-5`}>
+                                                {msg.content}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </Animated.View>
+                            ))}
+                        </ScrollView>
+
+                        {/* Input Area */}
+                        <BlurView intensity={30} tint="dark" style={tw`absolute bottom-0 left-0 right-0 p-6 pt-4 border-t border-white/10`}>
+                            <View style={tw`flex-row items-center gap-3`}>
+                                <View style={tw`flex-1 flex-row items-center bg-white/10 border border-white/20 rounded-full px-5 py-1`}>
+                                    <TextInput
+                                        style={tw`flex-1 text-white font-[InterTight] text-base py-3`}
+                                        placeholder="Add more details..."
+                                        placeholderTextColor="rgba(255,255,255,0.4)"
+                                        value={inputText}
+                                        onChangeText={setInputText}
+                                        multiline
+                                    />
+                                    <TouchableOpacity
+                                        onPress={handleSendMessage}
+                                        disabled={!inputText.trim()}
+                                        style={tw`w-9 h-9 rounded-full bg-white items-center justify-center ${!inputText.trim() ? 'opacity-50' : ''}`}
+                                    >
+                                        <Send color="#000" size={18} />
+                                    </TouchableOpacity>
+                                </View>
                                 <TouchableOpacity
-                                    onPress={() => setState('IDLE')}
-                                    style={tw`w-14 h-14 bg-white/10 border border-white/20 rounded-full items-center justify-center`}
+                                    style={tw`w-14 h-14 rounded-full bg-accent-violet items-center justify-center shadow-lg shadow-accent-violet/30`}
                                 >
-                                    <RotateCcw color="#fff" size={24} />
+                                    <Save color="#fff" size={24} />
                                 </TouchableOpacity>
                             </View>
-                        </View>
-                    )}
-                </View>
-            </ScrollView>
-
-            <View style={tw`absolute bottom-0 left-0 right-0 px-6 pb-12 pt-4 bg-transparent`}>
-                {state === 'IDLE' && (
-                    <View style={tw`w-full h-1 bg-white/5 rounded-full`} />
+                        </BlurView>
+                    </View>
                 )}
-            </View>
-        </GlassBackground>
+            </GlassBackground>
+        </KeyboardAvoidingView>
     );
 }
 
-const styles = StyleSheet.create({
-    // Add specific styles if needed
-});
+const styles = StyleSheet.create({});

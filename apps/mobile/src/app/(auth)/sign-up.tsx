@@ -11,6 +11,8 @@ import {
     FlatList,
     Animated,
     Dimensions,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { router } from 'expo-router';
@@ -18,6 +20,7 @@ import { ChevronLeft, Eye, EyeOff, ChevronDown, Check, X } from 'lucide-react-na
 import { GlassBackground } from '@/components/GlassBackground';
 import { BlurView } from 'expo-blur';
 import LottieView from 'lottie-react-native';
+import { useAuth } from '@/hooks/useAuth';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -207,6 +210,8 @@ export default function SignUpScreen() {
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const cardTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
+    const { signIn } = useAuth();
+
     useEffect(() => {
         if (showSuccessModal) {
             Animated.parallel([
@@ -226,9 +231,9 @@ export default function SignUpScreen() {
         else setStep((s) => s - 1);
     };
 
-    const handleModalClose = () => {
+    const handleModalClose = async () => {
         setShowSuccessModal(false);
-        router.replace('/(tabs)/home');
+        await signIn(nickname || firstName || 'New User');
     };
 
     const handlePersonaSelect = (id: string) => {
@@ -263,64 +268,70 @@ export default function SignUpScreen() {
 
                 {/* ── Step 1: Account Details ── */}
                 {step === 1 && (
-                    <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
-                        <View style={tw`px-6 pt-6 flex-1`}>
-                            <Text style={tw`text-3xl text-white font-[InterTight] font-bold mb-3`}>
-                                Create an account
-                            </Text>
-                            <Text style={tw`text-gray-400 font-[InterTight] font-medium text-base leading-6 mb-10`}>
-                                Please fill in your details to log you back into your enroute account
-                            </Text>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={tw`flex-1`}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                    >
+                        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                            <View style={tw`px-6 pt-6 flex-1`}>
+                                <Text style={tw`text-3xl text-white font-[InterTight] font-bold mb-3`}>
+                                    Create an account
+                                </Text>
+                                <Text style={tw`text-gray-400 font-[InterTight] font-medium text-base leading-6 mb-10`}>
+                                    Please fill in your details to log you back into your enroute account
+                                </Text>
 
-                            <FormField label="First Name">
-                                <View style={styles.inputRow}>
-                                    <TextInput style={styles.input} placeholder="Enter first name" placeholderTextColor="#666" value={firstName} onChangeText={setFirstName} />
-                                </View>
-                            </FormField>
+                                <FormField label="First Name">
+                                    <View style={styles.inputRow}>
+                                        <TextInput style={styles.input} placeholder="Enter first name" placeholderTextColor="#666" value={firstName} onChangeText={setFirstName} />
+                                    </View>
+                                </FormField>
 
-                            <FormField label="Last Name">
-                                <View style={styles.inputRow}>
-                                    <TextInput style={styles.input} placeholder="Enter last name" placeholderTextColor="#666" value={lastName} onChangeText={setLastName} />
-                                </View>
-                            </FormField>
+                                <FormField label="Last Name">
+                                    <View style={styles.inputRow}>
+                                        <TextInput style={styles.input} placeholder="Enter last name" placeholderTextColor="#666" value={lastName} onChangeText={setLastName} />
+                                    </View>
+                                </FormField>
 
-                            <FormField label="Phone Number">
-                                <View style={styles.inputRow}>
-                                    <TextInput style={styles.input} placeholder="Enter phone number" placeholderTextColor="#666" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-                                </View>
-                            </FormField>
+                                <FormField label="Phone Number">
+                                    <View style={styles.inputRow}>
+                                        <TextInput style={styles.input} placeholder="Enter phone number" placeholderTextColor="#666" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+                                    </View>
+                                </FormField>
 
-                            <FormField label="Password">
-                                <View style={[styles.inputRow, tw`relative justify-center`]}>
-                                    <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showPassword} value={password} onChangeText={setPassword} />
-                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                        {showPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
-                                    </TouchableOpacity>
-                                </View>
-                            </FormField>
-
-                            {/* Confirm Password — only shown when password has text */}
-                            {password.length > 0 && (
-                                <FormField label="Confirm Password">
-                                    <View style={[styles.inputRow, tw`relative justify-center`, passwordMismatch && { borderColor: '#FF453A' }]}>
-                                        <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
-                                        <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                            {showConfirmPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
+                                <FormField label="Password">
+                                    <View style={[styles.inputRow, tw`relative justify-center`]}>
+                                        <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showPassword} value={password} onChangeText={setPassword} />
+                                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                            {showPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
                                         </TouchableOpacity>
                                     </View>
-                                    {passwordMismatch && (
-                                        <Text style={tw`text-[#FF453A] font-[InterTight] text-xs mt-2 ml-1`}>Passwords do not match</Text>
-                                    )}
                                 </FormField>
-                            )}
-                        </View>
 
-                        <View style={tw`px-6 mt-4`}>
-                            <TouchableOpacity onPress={() => setStep(2)} activeOpacity={0.85} style={tw`w-full bg-white py-4 rounded-full items-center justify-center`}>
-                                <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>Get started</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </ScrollView>
+                                {/* Confirm Password — only shown when password has text */}
+                                {password.length > 0 && (
+                                    <FormField label="Confirm Password">
+                                        <View style={[styles.inputRow, tw`relative justify-center`, passwordMismatch && { borderColor: '#FF453A' }]}>
+                                            <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+                                            <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                                {showConfirmPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
+                                            </TouchableOpacity>
+                                        </View>
+                                        {passwordMismatch && (
+                                            <Text style={tw`text-[#FF453A] font-[InterTight] text-xs mt-2 ml-1`}>Passwords do not match</Text>
+                                        )}
+                                    </FormField>
+                                )}
+                            </View>
+
+                            <View style={tw`px-6`}>
+                                <TouchableOpacity onPress={() => setStep(2)} activeOpacity={0.85} style={tw`w-full bg-white py-4 rounded-full items-center justify-center`}>
+                                    <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>Get started</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </KeyboardAvoidingView>
                 )}
 
                 {/* ── Step 2: AI Persona ── */}
@@ -364,7 +375,7 @@ export default function SignUpScreen() {
 
                 {/* ── Step 3: Personalize ── */}
                 {step === 3 && (
-                    <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+                    <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }} keyboardShouldPersistTaps="handled" scrollEnabled={false}>
                         <View style={tw`px-6 pt-6 flex-1`}>
                             <Text style={tw`text-3xl text-white font-[InterTight] font-bold mb-3`}>
                                 Personalize your experience
@@ -388,7 +399,7 @@ export default function SignUpScreen() {
                             </FormField>
                         </View>
 
-                        <View style={tw`px-6 mt-4`}>
+                        <View style={tw`mb-2 mt-8 px-6`}>
                             <TouchableOpacity onPress={handleFinish} disabled={isLoading} activeOpacity={0.85} style={tw`w-full bg-white py-4 rounded-full items-center justify-center`}>
                                 <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>
                                     {isLoading ? 'Setting up...' : 'Continue'}

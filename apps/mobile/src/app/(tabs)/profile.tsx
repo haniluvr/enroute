@@ -8,7 +8,8 @@ import { useRouter, useLocalSearchParams, Link } from 'expo-router';
 
 // Mock Data
 const USER_INFO = {
-    name: 'Hana Marquis',
+    firstName: 'Hana',
+    lastName: 'Marquis',
     levelBadge: 'Professional', // [student, entry, intermediate, experienced, advanced, professional]
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop',
 };
@@ -94,7 +95,7 @@ export default function ProfileScreen() {
                                     numberOfLines={1}
                                     minimumFontScale={0.5}
                                 >
-                                    {USER_INFO.name}
+                                    {USER_INFO.firstName} {USER_INFO.lastName}
                                 </Text>
                                 <View style={tw`self-start bg-white/10 px-3 py-1 rounded-full border border-white/10`}>
                                     <Text style={tw`text-gray-400 text-xs font-inter-semibold`}>
@@ -104,7 +105,10 @@ export default function ProfileScreen() {
                             </View>
 
                             {/* Column 3: Edit Button */}
-                            <TouchableOpacity style={tw`flex-none bg-white/10 p-3 rounded-2xl border border-white/10`}>
+                            <TouchableOpacity
+                                style={tw`flex-none bg-white/10 p-3 rounded-2xl border border-white/10`}
+                                onPress={() => router.push('/edit-profile')}
+                            >
                                 <Pencil size={20} color="#fff" />
                             </TouchableOpacity>
                         </View>

@@ -23,6 +23,7 @@ export default function HomeScreen() {
                     <TouchableOpacity
                         style={tw`bg-white/10 p-2.5 rounded-xl border border-white/10`}
                         activeOpacity={0.7}
+                        onPress={() => router.push('/library')}
                     >
                         <FolderOpen color="#aaa" size={24} />
                     </TouchableOpacity>
@@ -69,7 +70,7 @@ export default function HomeScreen() {
                         <TouchableOpacity
                             style={tw`w-[48%]`}
                             activeOpacity={0.8}
-                            onPress={() => router.push('/career-interest-test')}
+                            onPress={() => router.push('/(tabs)/explore')}
                         >
                             <GlassCard style={tw`h-[140px] p-5 justify-between bg-white/10 shadow-xl border-t border-white/20`} noPadding>
                                 <View style={tw`bg-[#fcfcfc]/20 w-11 h-11 rounded-2xl items-center justify-center`}>

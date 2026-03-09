@@ -48,4 +48,9 @@ export const MOCK_QUOTES = [
     'How long can it take me to become a professional in the new role, with the current experience i have',
 ];
 
-export const MOCK_TRANSCRIPTION = "I'm looking to transition into product management role, could you help me understand what skill i need? to successfully transition..";
+export const MOCK_TRANSCRIPTION = [
+    { speaker: 'user', text: "I'm looking to transition into product management role, could you help me understand what skill i need?" },
+    { speaker: 'dahlia', text: "That's a great choice! Product management requires a blend of technical, business, and leadership skills. To start, how familiar are you with agile methodologies?" },
+    { speaker: 'user', text: "I've heard of them but haven't used them in a professional setting yet." },
+    { speaker: 'dahlia', text: "No problem. We can focus on that. You also mentioned wanting to pivot to marketing earlier—product management actually sits at the intersection of those fields." }
+];

@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
-import { Bell, Shield, HelpCircle, LogOut, ChevronRight, ArrowLeft, LucideIcon } from 'lucide-react-native';
+import { Bell, Shield, HelpCircle, LogOut, ChevronRight, ChevronLeft, LucideIcon, User } from 'lucide-react-native';
 import tw from '@/lib/tailwind';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassBackground } from '@/components/GlassBackground';
 import { router } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SettingsOptionProps {
     icon: LucideIcon;
@@ -54,8 +55,10 @@ const SettingsOption = ({
 );
 
 export default function SettingsScreen() {
-    const handleSignOut = () => {
-        router.replace('/(auth)/sign-in');
+    const { signOut } = useAuth();
+
+    const handleSignOut = async () => {
+        await signOut();
     };
 
     return (
@@ -66,29 +69,32 @@ export default function SettingsScreen() {
                     <View style={tw`flex-row items-center mb-8`}>
                         <TouchableOpacity
                             onPress={() => router.back()}
-                            style={tw`w-10 h-10 rounded-full bg-white/10 items-center justify-center mr-4`}
+                            style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mr-4`}
                         >
-                            <ArrowLeft size={24} color="white" />
+                            <ChevronLeft size={24} color="white" />
                         </TouchableOpacity>
                         <Text style={tw`text-white text-3xl font-inter-bold`}>Settings</Text>
                     </View>
 
-                    <ScrollView showsVerticalScrollIndicator={false}>
+                    <ScrollView scrollEnabled={false} showsVerticalScrollIndicator={false}>
                         <GlassCard noPadding style={tw`bg-white/5 border-white/5 px-5 py-1`}>
                             <SettingsOption
                                 icon={Bell}
                                 title="Notifications"
                                 subtitle="Manage alerts & reminders"
+                                onPress={() => router.push('/notifications')}
                             />
                             <SettingsOption
                                 icon={Shield}
                                 title="Privacy & Security"
                                 subtitle="Data & account settings"
+                                onPress={() => router.push('/privacy')}
                             />
                             <SettingsOption
                                 icon={HelpCircle}
                                 title="Help & Support"
                                 subtitle="FAQs, contact support"
+                                onPress={() => router.push('/support')}
                             />
                             <SettingsOption
                                 icon={LogOut}
