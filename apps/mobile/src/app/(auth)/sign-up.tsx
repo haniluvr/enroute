@@ -207,12 +207,26 @@ export default function SignUpScreen() {
     // Shared
     const [isLoading, setIsLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [generalError, setGeneralError] = useState('');
+
+    // Error States Step 1
+    const [firstNameError, setFirstNameError] = useState('');
+    const [lastNameError, setLastNameError] = useState('');
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
     // Animated modal
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const cardTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
+    // Error States Step 2 & 3
+    const [personaError, setPersonaError] = useState('');
+    const [careerError, setCareerError] = useState('');
+    const [levelError, setLevelError] = useState('');
+
     const { signIn } = useAuth();
+    const [showErrorToast, setShowErrorToast] = useState(false);
 
     useEffect(() => {
         if (showSuccessModal) {
@@ -228,9 +242,87 @@ export default function SignUpScreen() {
         }
     }, [showSuccessModal]);
 
+    const validateStep1 = () => {
+        let isValid = true;
+
+        if (!firstName.trim()) {
+            setFirstNameError('First name is required');
+            isValid = false;
+        } else {
+            setFirstNameError('');
+        }
+
+        if (!lastName.trim()) {
+            setLastNameError('Last name is required');
+            isValid = false;
+        } else {
+            setLastNameError('');
+        }
+
+        if (!email.trim()) {
+            setEmailError('Email is required');
+            isValid = false;
+        } else if (!/\S+@\S+\.\S+/.test(email)) {
+            setEmailError('Valid email required');
+            isValid = false;
+        } else {
+            setEmailError('');
+        }
+
+        if (password.length < 6) {
+            setPasswordError('Min 6 characters');
+            isValid = false;
+        } else {
+            setPasswordError('');
+        }
+
+        if (confirmPassword !== password) {
+            setConfirmPasswordError('Passwords must match');
+            isValid = false;
+        } else {
+            setConfirmPasswordError('');
+        }
+
+        return isValid;
+    };
+
+    const handleNextStep1 = () => {
+        if (validateStep1()) {
+            setStep(2);
+        }
+    };
+
+    const handleNextStep2 = () => {
+        if (!selectedPersona) {
+            setPersonaError('Please select a persona to continue');
+        } else {
+            setPersonaError('');
+            setStep(3);
+        }
+    };
+
+    const validateStep3 = () => {
+        let isValid = true;
+        if (!careerInterest) {
+            setCareerError('Career interest is required');
+            isValid = false;
+        } else {
+            setCareerError('');
+        }
+
+        if (!currentLevel) {
+            setLevelError('Current level is required');
+            isValid = false;
+        } else {
+            setLevelError('');
+        }
+        return isValid;
+    };
+
     const handleBack = () => {
         if (step === 1) router.back();
         else setStep((s) => s - 1);
+        setGeneralError('');
     };
 
     const handleModalClose = async () => {
@@ -240,11 +332,15 @@ export default function SignUpScreen() {
 
     const handlePersonaSelect = (id: string) => {
         setSelectedPersona(id);
+        if (personaError) setPersonaError('');
         // TODO: Play voice preview for selected persona
     };
 
     const handleFinish = async () => {
+        if (!validateStep3()) return;
+
         setIsLoading(true);
+        setGeneralError('');
         try {
             const { data, error } = await supabase.auth.signUp({
                 email: email,
@@ -262,12 +358,14 @@ export default function SignUpScreen() {
                 }
             });
 
-            if (error) throw error;
+            if (error) {
+                setGeneralError(error.message);
+                throw error;
+            }
 
             setShowSuccessModal(true);
         } catch (error) {
             console.error('Signup error:', error);
-            // Could add an alert or error state here
         } finally {
             setIsLoading(false);
         }
@@ -307,21 +405,24 @@ export default function SignUpScreen() {
                                 </Text>
 
                                 <FormField label="First Name">
-                                    <View style={styles.inputRow}>
-                                        <TextInput style={styles.input} placeholder="Enter first name" placeholderTextColor="#666" value={firstName} onChangeText={setFirstName} />
+                                    <View style={[styles.inputRow, firstNameError && { borderColor: '#FF453A' }]}>
+                                        <TextInput style={styles.input} placeholder="Enter first name" placeholderTextColor="#666" value={firstName} onChangeText={(t) => { setFirstName(t); if (firstNameError) setFirstNameError(''); }} />
                                     </View>
+                                    {firstNameError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{firstNameError}</Text> : null}
                                 </FormField>
 
                                 <FormField label="Last Name">
-                                    <View style={styles.inputRow}>
-                                        <TextInput style={styles.input} placeholder="Enter last name" placeholderTextColor="#666" value={lastName} onChangeText={setLastName} />
+                                    <View style={[styles.inputRow, lastNameError && { borderColor: '#FF453A' }]}>
+                                        <TextInput style={styles.input} placeholder="Enter last name" placeholderTextColor="#666" value={lastName} onChangeText={(t) => { setLastName(t); if (lastNameError) setLastNameError(''); }} />
                                     </View>
+                                    {lastNameError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{lastNameError}</Text> : null}
                                 </FormField>
 
                                 <FormField label="Email Address">
-                                    <View style={styles.inputRow}>
-                                        <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor="#666" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+                                    <View style={[styles.inputRow, emailError && { borderColor: '#FF453A' }]}>
+                                        <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor="#666" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={(t) => { setEmail(t); if (emailError) setEmailError(''); }} />
                                     </View>
+                                    {emailError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{emailError}</Text> : null}
                                 </FormField>
 
                                 <FormField label="Phone Number (Optional)">
@@ -331,32 +432,33 @@ export default function SignUpScreen() {
                                 </FormField>
 
                                 <FormField label="Password">
-                                    <View style={[styles.inputRow, tw`relative justify-center`]}>
-                                        <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showPassword} value={password} onChangeText={setPassword} />
+                                    <View style={[styles.inputRow, tw`relative justify-center`, passwordError && { borderColor: '#FF453A' }]}>
+                                        <TextInput style={styles.input} placeholder="Enter password (min 6 chars)" placeholderTextColor="#666" secureTextEntry={!showPassword} value={password} onChangeText={(t) => { setPassword(t); if (passwordError) setPasswordError(''); }} />
                                         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                             {showPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
                                         </TouchableOpacity>
                                     </View>
+                                    {passwordError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{passwordError}</Text> : null}
                                 </FormField>
 
                                 {/* Confirm Password — only shown when password has text */}
                                 {password.length > 0 && (
                                     <FormField label="Confirm Password">
-                                        <View style={[styles.inputRow, tw`relative justify-center`, passwordMismatch && { borderColor: '#FF453A' }]}>
-                                            <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} />
+                                        <View style={[styles.inputRow, tw`relative justify-center`, (passwordMismatch || confirmPasswordError) && { borderColor: '#FF453A' }]}>
+                                            <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={(t) => { setConfirmPassword(t); if (confirmPasswordError) setConfirmPasswordError(''); }} />
                                             <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                                 {showConfirmPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
                                             </TouchableOpacity>
                                         </View>
-                                        {passwordMismatch && (
-                                            <Text style={tw`text-[#FF453A] font-[InterTight] text-xs mt-2 ml-1`}>Passwords do not match</Text>
+                                        {(passwordMismatch || confirmPasswordError) && (
+                                            <Text style={tw`text-[#FF453A] font-[InterTight] text-xs mt-2 ml-1`}>{confirmPasswordError || "Passwords do not match"}</Text>
                                         )}
                                     </FormField>
                                 )}
                             </View>
 
                             <View style={tw`px-6`}>
-                                <TouchableOpacity onPress={() => setStep(2)} activeOpacity={0.85} style={tw`w-full bg-white py-4 rounded-full items-center justify-center`}>
+                                <TouchableOpacity onPress={handleNextStep1} activeOpacity={0.85} style={tw`w-full bg-white py-4 rounded-full items-center justify-center`}>
                                     <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>Get started</Text>
                                 </TouchableOpacity>
                             </View>
@@ -372,6 +474,13 @@ export default function SignUpScreen() {
                             Choose an avatar or voice you'd like to hear speak.
                         </Text>
 
+                        {/* Persona Selection area */}
+                        {personaError ? (
+                            <View style={tw`bg-red-500/10 border border-red-500/20 p-3 rounded-xl mb-6`}>
+                                <Text style={tw`text-red-400 font-[InterTight] text-sm text-center`}>{personaError}</Text>
+                            </View>
+                        ) : null}
+
                         {/* Cards — aligned to center so Dahlia card below is naturally centered */}
                         <View style={{ gap: 12, marginBottom: 'auto', alignItems: 'center' }}>
                             {/* Row 1: Male + Female */}
@@ -382,6 +491,7 @@ export default function SignUpScreen() {
                                         persona={persona}
                                         isSelected={selectedPersona === persona.id}
                                         onPress={() => handlePersonaSelect(persona.id)}
+                                        extraStyle={personaError ? { borderColor: '#FF453A' } : {}}
                                     />
                                 ))}
                             </View>
@@ -391,12 +501,12 @@ export default function SignUpScreen() {
                                 persona={PERSONAS[2]}
                                 isSelected={selectedPersona === PERSONAS[2].id}
                                 onPress={() => handlePersonaSelect(PERSONAS[2].id)}
-                                extraStyle={{ flex: 0, width: '47%' }}
+                                extraStyle={[{ flex: 0, width: '47%' }, personaError ? { borderColor: '#FF453A' } : {}]}
                             />
                         </View>
 
                         <View style={tw`pb-10 mt-8`}>
-                            <TouchableOpacity onPress={() => setStep(3)} activeOpacity={0.85} style={tw`w-full bg-white py-4 rounded-full items-center justify-center`}>
+                            <TouchableOpacity onPress={handleNextStep2} activeOpacity={0.85} style={tw`w-full bg-white py-4 rounded-full items-center justify-center`}>
                                 <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>Continue</Text>
                             </TouchableOpacity>
                         </View>
@@ -414,18 +524,26 @@ export default function SignUpScreen() {
                                 Personalize your profile and choose a nickname you'd like to be called.
                             </Text>
 
-                            <FormField label="Nickname">
+                            {generalError ? (
+                                <View style={tw`bg-red-500/10 border border-red-500/20 p-2 rounded-lg mb-4`}>
+                                    <Text style={tw`text-red-400 font-[InterTight] text-xs text-center`}>{generalError}</Text>
+                                </View>
+                            ) : null}
+
+                            <FormField label="Nickname (Optional)">
                                 <View style={styles.inputRow}>
                                     <TextInput style={styles.input} placeholder="Enter nickname" placeholderTextColor="#666" value={nickname} onChangeText={setNickname} />
                                 </View>
                             </FormField>
 
                             <FormField label="Career Interest">
-                                <DropdownSelector value={careerInterest} placeholder="Select career interest" options={CAREER_INTERESTS} onSelect={setCareerInterest} />
+                                <DropdownSelector value={careerInterest} placeholder="Select career interest" options={CAREER_INTERESTS} onSelect={(v) => { setCareerInterest(v); if (careerError) setCareerError(''); }} />
+                                {careerError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{careerError}</Text> : null}
                             </FormField>
 
                             <FormField label="Current Level">
-                                <DropdownSelector value={currentLevel} placeholder="Select current level" options={CURRENT_LEVELS} onSelect={setCurrentLevel} />
+                                <DropdownSelector value={currentLevel} placeholder="Select current level" options={CURRENT_LEVELS} onSelect={(v) => { setCurrentLevel(v); if (levelError) setLevelError(''); }} />
+                                {levelError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{levelError}</Text> : null}
                             </FormField>
                         </View>
 

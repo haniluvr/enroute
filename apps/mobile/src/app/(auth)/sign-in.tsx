@@ -19,8 +19,9 @@ export default function SignInScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-    // State to track if the login attempt failed
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [generalError, setGeneralError] = useState('');
     const [hasLoginFailed, setHasLoginFailed] = useState(false);
 
     // Animated modal values
@@ -51,9 +52,36 @@ export default function SignInScreen() {
         }
     }, [showSuccessModal]);
 
+    const validate = () => {
+        let isValid = true;
+        setGeneralError('');
+
+        if (!email.trim()) {
+            setEmailError('Email is required');
+            isValid = false;
+        } else if (!/\S+@\S+\.\S+/.test(email)) {
+            setEmailError('Please enter a valid email');
+            isValid = false;
+        } else {
+            setEmailError('');
+        }
+
+        if (!password) {
+            setPasswordError('Password is required');
+            isValid = false;
+        } else {
+            setPasswordError('');
+        }
+
+        return isValid;
+    };
+
     const handleLogin = async () => {
+        if (!validate()) return;
+
         setIsLoading(true);
         setHasLoginFailed(false);
+        setGeneralError('');
 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -61,13 +89,20 @@ export default function SignInScreen() {
                 password: password,
             });
 
-            if (error) throw error;
+            if (error) {
+                if (error.message.includes('Invalid login credentials')) {
+                    setGeneralError('Invalid email or password');
+                    setHasLoginFailed(true);
+                } else {
+                    setGeneralError(error.message);
+                }
+                throw error;
+            }
 
             setUserName(data.user?.user_metadata?.first_name || data.user?.user_metadata?.nickname || email.split('@')[0]);
             setShowSuccessModal(true);
         } catch (error) {
             console.error('Login error:', error);
-            setHasLoginFailed(true);
         } finally {
             setIsLoading(false);
         }
@@ -100,33 +135,57 @@ export default function SignInScreen() {
                     </Text>
 
                     {/* Form Fields */}
+                    {generalError ? (
+                        <View style={tw`bg-red-500/10 border border-red-500/20 p-3 rounded-xl mb-6`}>
+                            <Text style={tw`text-red-400 font-[InterTight] text-sm text-center`}>{generalError}</Text>
+                        </View>
+                    ) : null}
+
                     <View style={tw`mb-5`}>
-                        <Text style={tw`text-white font-[InterTight] font-medium text-sm mb-2`}>Email</Text>
+                        <View style={tw`flex-row justify-between items-center mb-2`}>
+                            <Text style={tw`text-white font-[InterTight] font-medium text-sm`}>Email</Text>
+                            {emailError ? <Text style={tw`text-red-400 text-xs font-[InterTight]`}>{emailError}</Text> : null}
+                        </View>
                         <View style={tw`relative justify-center h-[54px]`}>
                             <TextInput
-                                style={[tw`flex-1 bg-transparent border border-white/20 rounded-xl pl-4 text-white font-[InterTight] text-base`, { lineHeight: undefined }]}
+                                style={[
+                                    tw`flex-1 bg-transparent border rounded-xl pl-4 text-white font-[InterTight] text-base`,
+                                    { borderColor: emailError ? '#ef4444' : 'rgba(255,255,255,0.2)', lineHeight: undefined }
+                                ]}
                                 placeholder="Enter email address"
                                 placeholderTextColor="#666"
                                 textAlignVertical='center'
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 value={email}
-                                onChangeText={setEmail}
+                                onChangeText={(text) => {
+                                    setEmail(text);
+                                    if (emailError) setEmailError('');
+                                }}
                             />
                         </View>
                     </View>
 
                     <View style={tw`mb-2`}>
-                        <Text style={tw`text-white font-[InterTight] font-medium text-sm mb-2`}>Password</Text>
+                        <View style={tw`flex-row justify-between items-center mb-2`}>
+                            <Text style={tw`text-white font-[InterTight] font-medium text-sm`}>Password</Text>
+                            {passwordError ? <Text style={tw`text-red-400 text-xs font-[InterTight]`}>{passwordError}</Text> : null}
+                        </View>
                         <View style={tw`relative justify-center h-[54px]`}>
                             <TextInput
-                                style={[tw`flex-1 bg-transparent border border-white/20 rounded-xl pl-4 text-white font-[InterTight] text-base`, { lineHeight: undefined }]}
+                                style={[
+                                    tw`flex-1 bg-transparent border rounded-xl pl-4 text-white font-[InterTight] text-base`,
+                                    { borderColor: passwordError ? '#ef4444' : 'rgba(255,255,255,0.2)', lineHeight: undefined }
+                                ]}
                                 placeholder="Enter password"
                                 placeholderTextColor="#666"
                                 textAlignVertical='center'
                                 secureTextEntry={!showPassword}
                                 value={password}
-                                onChangeText={setPassword}
+                                onChangeText={(text) => {
+                                    setPassword(text);
+                                    if (passwordError) setPasswordError('');
+                                }}
                             />
                             <TouchableOpacity
                                 onPress={() => setShowPassword(!showPassword)}
