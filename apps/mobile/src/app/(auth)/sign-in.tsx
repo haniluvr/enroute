@@ -2,6 +2,7 @@ import tw from '@/lib/tailwind';
 import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, Animated, Dimensions } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { Link, router } from 'expo-router';
+import { supabase } from '@/config/supabase';
 import { ChevronLeft, Eye, EyeOff, X } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { Modal } from 'react-native';
@@ -13,6 +14,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function SignInScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [userName, setUserName] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -46,16 +48,26 @@ export default function SignInScreen() {
         }
     }, [showSuccessModal]);
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         setIsLoading(true);
-        // Reset failure state on new attempt
         setHasLoginFailed(false);
 
-        // Simulate networking
-        setTimeout(() => {
-            setIsLoading(false);
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password,
+            });
+
+            if (error) throw error;
+            
+            setUserName(data.user?.user_metadata?.first_name || data.user?.user_metadata?.nickname || email.split('@')[0]);
             setShowSuccessModal(true);
-        }, 1500);
+        } catch (error) {
+            console.error('Login error:', error);
+            setHasLoginFailed(true);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleModalClose = () => {
@@ -198,7 +210,7 @@ export default function SignInScreen() {
 
                             {/* Title and Text */}
                             <Text style={tw`text-3xl text-white font-[InterTight] font-medium mt-8 mb-2 text-center`}>
-                                Welcome, {email ? email.split('@')[0] : 'admin'}!
+                                Welcome, {userName ? userName : 'admin'}!
                             </Text>
                             <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-5 mb-4 px-2`}>
                                 Ask questions, get career roadmaps,{'\n'}and explore resources
