@@ -1,11 +1,11 @@
-# Database Operations (Firebase + Node/Express Hybrid)
+# Database Operations (Supabase + Node/Express Hybrid)
 
 Because we are using a dual-backend approach to maximize development speed and security, we have specific rules for where and how database operations occur.
 
-## 1. Firebase Firestore (Primary DB)
-Firestore is the single source of truth.
-- **Client-Side Reads**: The Mobile (Expo) and Web (Vite) apps should read public or secure user-specific data *directly* from Firestore using the Firebase JS SDK (e.g., `onSnapshot` for real-time updates).
-- **Client-Side Writes (Simple)**: The client can write directly to Firestore for simple, non-sensitive actions (e.g., updating a profile bio, saving a job card) IF governed by strict Firebase Security Rules.
+## 1. Supabase PostgreSQL (Primary DB)
+Supabase is the single source of truth.
+- **Client-Side Reads**: The Mobile (Expo) and Web (Vite) apps should read public or secure user-specific data *directly* from Supabase using the Supabase JS SDK (e.g., leveraging real-time subscriptions if necessary).
+- **Client-Side Writes (Simple)**: The client can write directly to PostgreSQL for simple, non-sensitive actions (e.g., updating a profile bio, saving a job card) IF governed by strict Row Level Security (RLS) policies.
 - **No Complex Queries**: If a query is complex, requires aggregation, or needs external data (like calling OpenAI), do NOT do it on the client. 
 
 ## 2. Node.js / Express API (Microservice)
@@ -16,18 +16,18 @@ The Express backend acts as a secure, heavy-lifting layer.
   3. Web scraping (PhilJobNet) or external API calls (LinkedIn, JobDataAPI).
   4. complex matching algorithms for User Profile vs Job Data.
 - **How to Use**:
-  - The frontend makes an authenticated HTTP request to the Express API (passing the Firebase Auth ID Token).
-  - Express verifies the token using `firebase-admin`.
+  - The frontend makes an authenticated HTTP request to the Express API (passing the Supabase Auth JWT).
+  - Express verifies the token using the Supabase JWT secret or by fetching the user via the API.
   - Express performs the heavy task.
-  - Express writes the result back into Firestore via the `firebase-admin` SDK. The client app will automatically see this new data via its active `onSnapshot` listener.
+  - Express writes the result back into PostgreSQL via the Supabase client utilizing the Service Role Key. The client app will automatically see this new data if subscribed to real-time updates.
 
 ## 3. Data Structure Principles
-- **Denormalization**: It is okay to duplicate data in Firestore to avoid joins. For example, copy top-level Mentor info into a `MentorSession` document.
-- **Collections Needed (MVP Base)**:
-  - `users`: `{ role: 'student'|'mentor'|'admin', profile: {...}, settings: {...} }`
-  - `roadmaps`: nested inside users or as a separate collection linked by `userId`.
-  - `announcements`: Global collection.
-  - `institutions`: Global catalog.
-  - `mentors`: Derived from `users` where `role == 'mentor'`.
+- **Relational Integrity**: Utilize PostgreSQL's relational nature. Use Foreign Keys safely.
+- **Tables Needed (MVP Base)**:
+  - `users`: Managed mostly by Supabase Auth, but usually mirrored in a `public.profiles` or `public.users` table for custom metadata.
+  - `roadmaps`: Linked by `user_id`.
+  - `announcements`: Global table.
+  - `institutions`: Global catalog table.
+  - `mentors`: A table or view derived from users where `role == 'mentor'`.
 
-> **Rule of Thumb**: Try to do it directly in Firebase first for speed. If it's insecure, too heavy, or requires an API secret, move the logic to Express.
+> **Rule of Thumb**: Try to do it directly in Supabase first for speed. If it's insecure, too heavy, or requires an API secret, move the logic to Express.

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { router } from 'expo-router';
+import { supabase } from '@/config/supabase';
 import { ChevronLeft, Eye, EyeOff, ChevronDown, Check, X } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { BlurView } from 'expo-blur';
@@ -188,6 +189,7 @@ export default function SignUpScreen() {
     // Step 1
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
+    const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -241,12 +243,34 @@ export default function SignUpScreen() {
         // TODO: Play voice preview for selected persona
     };
 
-    const handleFinish = () => {
+    const handleFinish = async () => {
         setIsLoading(true);
-        setTimeout(() => {
-            setIsLoading(false);
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    data: {
+                        first_name: firstName,
+                        last_name: lastName,
+                        phone: phone,
+                        persona: selectedPersona,
+                        nickname: nickname,
+                        career_interest: careerInterest,
+                        current_level: currentLevel
+                    }
+                }
+            });
+
+            if (error) throw error;
+
             setShowSuccessModal(true);
-        }, 1500);
+        } catch (error) {
+            console.error('Signup error:', error);
+            // Could add an alert or error state here
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const passwordMismatch = confirmPassword.length > 0 && confirmPassword !== password;
@@ -294,7 +318,13 @@ export default function SignUpScreen() {
                                     </View>
                                 </FormField>
 
-                                <FormField label="Phone Number">
+                                <FormField label="Email Address">
+                                    <View style={styles.inputRow}>
+                                        <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor="#666" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
+                                    </View>
+                                </FormField>
+
+                                <FormField label="Phone Number (Optional)">
                                     <View style={styles.inputRow}>
                                         <TextInput style={styles.input} placeholder="Enter phone number" placeholderTextColor="#666" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
                                     </View>

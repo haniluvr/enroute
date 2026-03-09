@@ -10,8 +10,8 @@ export default function HomeScreen() {
     const { user } = useAuth();
     const router = useRouter();
 
-    // Fallback names for now since Firebase isn't live
-    const displayName = user?.displayName || 'Hana';
+    // Fallback names for now since Supabase isn't live
+    const displayName = user?.user_metadata?.first_name || 'Hana';
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
