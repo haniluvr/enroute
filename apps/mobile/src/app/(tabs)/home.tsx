@@ -10,8 +10,8 @@ export default function HomeScreen() {
     const { user } = useAuth();
     const router = useRouter();
 
-    // Fallback names for now since Supabase isn't live
-    const displayName = user?.user_metadata?.first_name || 'Hana';
+    // Priority: nickname first, then first name, lastly User
+    const displayName = user?.user_metadata?.nickname || user?.user_metadata?.first_name || 'User';
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>

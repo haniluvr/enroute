@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView } from 'react-native';
-import { Settings, Pencil, Trophy, BookOpen, Map, Send, Star, Briefcase, Target, GraduationCap, Route } from 'lucide-react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { Settings, Pencil, Trophy, BookOpen, Map, Send, Star, Briefcase, Target, GraduationCap, Route, Mail, RefreshCw } from 'lucide-react-native';
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassButton } from '@/components/GlassButton';
 import { useRouter, Link } from 'expo-router';
 import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 // Mock Data for things not yet in Supabase
 const STATS = [
@@ -41,34 +42,56 @@ const getProgressColor = (progress: number) => {
 
 export default function ProfileScreen() {
     const router = useRouter();
-    const [userName, setUserName] = useState('Loading...');
+    const { user, refreshUser } = useAuth();
+    const [displayName, setDisplayName] = useState('Loading...');
     const [levelBadge, setLevelBadge] = useState('New User');
     const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop');
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const isVerified = user?.email_confirmed_at != null;
 
     useEffect(() => {
-        const fetchUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user && user.user_metadata) {
-                const firstName = user.user_metadata.first_name || '';
-                const lastName = user.user_metadata.last_name || '';
-                const nickname = user.user_metadata.nickname || '';
-                const emailPrefix = user.email ? user.email.split('@')[0] : 'User';
+        if (user) {
+            const metadata = user.user_metadata || {};
+            const firstName = metadata.first_name || '';
+            const lastName = metadata.last_name || '';
 
-                const displayFirst = firstName || nickname || emailPrefix;
-                const displayFull = lastName ? `${displayFirst} ${lastName}` : displayFirst;
-
-                setUserName(displayFull);
-                setLevelBadge(user.user_metadata.current_level || 'New User');
-                if (user.user_metadata.avatar_url) {
-                    setAvatar(user.user_metadata.avatar_url);
-                }
+            // Priority: First + Last name, then nickname, then 'User'
+            if (firstName || lastName) {
+                setDisplayName(`${firstName} ${lastName}`.trim());
+            } else if (metadata.nickname) {
+                setDisplayName(metadata.nickname);
             } else {
-                setUserName('Guest');
+                setDisplayName('User');
             }
-        };
 
-        fetchUser();
-    }, []);
+            setLevelBadge(metadata.current_level || 'New User');
+            if (metadata.avatar_url) {
+                setAvatar(metadata.avatar_url);
+            }
+        } else {
+            setDisplayName('Guest');
+        }
+    }, [user]);
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await refreshUser();
+        setIsRefreshing(false);
+    };
+
+    const handleResendVerification = async () => {
+        if (!user?.email) return;
+        const { error } = await supabase.auth.resend({
+            type: 'signup',
+            email: user.email,
+        });
+        if (error) {
+            Alert.alert('Error', error.message);
+        } else {
+            Alert.alert('Success', 'Verification email resent!');
+        }
+    };
 
     const handleSignOut = async () => {
         await supabase.auth.signOut();
@@ -124,7 +147,7 @@ export default function ProfileScreen() {
                                     numberOfLines={1}
                                     minimumFontScale={0.5}
                                 >
-                                    {userName}
+                                    {displayName}
                                 </Text>
                                 <View style={tw`self-start bg-white/10 px-3 py-1 rounded-full border border-white/10`}>
                                     <Text style={tw`text-gray-400 text-xs font-[InterTight-SemiBold]`}>
@@ -160,6 +183,41 @@ export default function ProfileScreen() {
                             ))}
                         </View>
                     </GlassCard>
+
+                    {/* Email Verification Card - Only shown if not verified */}
+                    {!isVerified && (
+                        <GlassCard style={tw`mb-6 p-5 bg-red-500/10 border border-red-500/20`} noPadding>
+                            <View style={tw`flex-row items-start`}>
+                                <View style={tw`bg-red-500/20 p-2.5 rounded-xl mr-4`}>
+                                    <Mail color="#ef4444" size={24} />
+                                </View>
+                                <View style={tw`flex-1`}>
+                                    <Text style={tw`text-white font-[InterTight-Bold] text-base mb-1`}>Verify your email</Text>
+                                    <Text style={tw`text-gray-400 font-[InterTight] text-sm leading-5 mb-4`}>
+                                        Please verify your email address to access all features. Check your inbox for the verification link.
+                                    </Text>
+                                    <View style={tw`flex-row gap-3`}>
+                                        <TouchableOpacity
+                                            onPress={handleResendVerification}
+                                            style={tw`bg-white/10 px-4 py-2 rounded-lg border border-white/10`}
+                                        >
+                                            <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>Resend Email</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={handleRefresh}
+                                            disabled={isRefreshing}
+                                            style={tw`bg-white/10 px-4 py-2 rounded-lg border border-white/10 flex-row items-center`}
+                                        >
+                                            <RefreshCw color="#fff" size={12} style={[tw`mr-2`, isRefreshing && { transform: [{ rotate: '45deg' }] }]} />
+                                            <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>
+                                                {isRefreshing ? 'Checking...' : 'I\'ve Verified'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
+                        </GlassCard>
+                    )}
 
                     {/* Top Skills */}
                     <GlassCard noPadding style={tw`mb-6 p-6 bg-white/5`}>
@@ -217,12 +275,6 @@ export default function ProfileScreen() {
                         </View>
                     </GlassCard>
 
-                    <GlassButton
-                        title="Sign Out"
-                        variant="danger"
-                        onPress={handleSignOut}
-                        style={tw`mb-8`}
-                    />
 
                     {/* Footer branding */}
                     <View style={tw`items-center opacity-40 mb-4`}>

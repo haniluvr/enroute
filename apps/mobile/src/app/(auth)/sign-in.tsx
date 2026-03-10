@@ -15,7 +15,6 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function SignInScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [userName, setUserName] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -23,6 +22,8 @@ export default function SignInScreen() {
     const [passwordError, setPasswordError] = useState('');
     const [generalError, setGeneralError] = useState('');
     const [hasLoginFailed, setHasLoginFailed] = useState(false);
+    const [displayName, setDisplayName] = useState('');
+    const [userMetadata, setUserMetadata] = useState<any>(null);
 
     // Animated modal values
     const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -93,13 +94,32 @@ export default function SignInScreen() {
                 if (error.message.includes('Invalid login credentials')) {
                     setGeneralError('Invalid email or password');
                     setHasLoginFailed(true);
+                } else if (error.message.toLowerCase().includes('email not confirmed')) {
+                    // Try to fetch profile since sign-in is blocked
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('email', email)
+                        .maybeSingle();
+
+                    const metadata = profile || {};
+                    setUserMetadata(metadata);
+                    setDisplayName(metadata.nickname || metadata.first_name || 'User');
+                    setShowSuccessModal(true);
+                    return;
                 } else {
                     setGeneralError(error.message);
                 }
                 throw error;
             }
 
-            setUserName(data.user?.user_metadata?.first_name || data.user?.user_metadata?.nickname || email.split('@')[0]);
+            const metadata = data.user?.user_metadata || {};
+            setUserMetadata(metadata);
+
+            const first = metadata.first_name || '';
+            const nick = metadata.nickname || '';
+
+            setDisplayName(nick || first || 'User');
             setShowSuccessModal(true);
         } catch (error) {
             console.error('Login error:', error);
@@ -110,7 +130,8 @@ export default function SignInScreen() {
 
     const handleModalClose = async () => {
         setShowSuccessModal(false);
-        await signIn(email || 'admin@enroute.dev');
+        await signIn(email, userMetadata);
+        router.replace('/(tabs)/home');
     };
 
     return (
@@ -272,7 +293,7 @@ export default function SignInScreen() {
 
                             {/* Title and Text */}
                             <Text style={tw`text-3xl text-white font-[InterTight] font-medium mt-8 mb-2 text-center`}>
-                                Welcome, {userName ? userName : 'admin'}!
+                                Welcome, {displayName || 'User'}!
                             </Text>
                             <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-5 mb-4 px-2`}>
                                 Ask questions, get career roadmaps,{'\n'}and explore resources

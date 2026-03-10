@@ -225,7 +225,7 @@ export default function SignUpScreen() {
     const [careerError, setCareerError] = useState('');
     const [levelError, setLevelError] = useState('');
 
-    const { signIn } = useAuth();
+    const { signIn, syncProfile } = useAuth();
     const [showErrorToast, setShowErrorToast] = useState(false);
 
     useEffect(() => {
@@ -327,7 +327,19 @@ export default function SignUpScreen() {
 
     const handleModalClose = async () => {
         setShowSuccessModal(false);
-        await signIn(nickname || firstName || 'New User');
+        const metadata = {
+            first_name: firstName,
+            last_name: lastName,
+            nickname: nickname,
+            persona: selectedPersona,
+            career_interest: careerInterest,
+            current_level: currentLevel
+        };
+        // Set local state for immediate "Hi Name"
+        await signIn(email, metadata);
+        // Persist to DB
+        await syncProfile(metadata);
+        router.replace('/(tabs)/home');
     };
 
     const handlePersonaSelect = (id: string) => {
@@ -575,7 +587,7 @@ export default function SignUpScreen() {
                             </TouchableOpacity>
 
                             <Text style={tw`text-3xl text-white font-[InterTight] font-medium mt-8 mb-2 text-center`}>
-                                You're all set, {nickname || firstName}!
+                                You're all set, {nickname || firstName || 'User'}!
                             </Text>
                             <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-5 mb-4 px-2`}>
                                 Ask questions, get career roadmaps,{'\n'}and explore resources

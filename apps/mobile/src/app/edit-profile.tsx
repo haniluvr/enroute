@@ -1,19 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, Image, KeyboardAvoidingView, Platform } from 'react-native';
-import { Camera, ChevronLeft, User, Mail, Phone } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, TextInput, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { Camera, ChevronLeft, User, Mail, Phone, Tag } from 'lucide-react-native';
 import tw from '@/lib/tailwind';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassBackground } from '@/components/GlassBackground';
 import { router } from 'expo-router';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/config/supabase';
 
-// Mock Initial Data (In a real app, this would come from a hook or state management)
-const INITIAL_USER = {
-    firstName: 'Hana',
-    lastName: 'Marquis',
-    email: 'hana.marquis@example.com',
-    phone: '+1 234 567 890',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop',
-};
 
 interface EditFieldProps {
     label: string;
@@ -50,14 +44,51 @@ const EditField = ({
 );
 
 export default function EditProfileScreen() {
-    const [firstName, setFirstName] = useState(INITIAL_USER.firstName);
-    const [lastName, setLastName] = useState(INITIAL_USER.lastName);
-    const [phone, setPhone] = useState(INITIAL_USER.phone);
-    const [email, setEmail] = useState(INITIAL_USER.email);
+    const { user, refreshUser } = useAuth();
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
+    const [nickname, setNickname] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSave = () => {
-        // Handle saving logic here
-        router.back();
+    useEffect(() => {
+        if (user) {
+            setFirstName(user.user_metadata?.first_name || '');
+            setLastName(user.user_metadata?.last_name || '');
+            setPhone(user.user_metadata?.phone || '');
+            setEmail(user.email || '');
+            setNickname(user.user_metadata?.nickname || '');
+        }
+    }, [user]);
+
+    const handleSave = async () => {
+        setIsLoading(true);
+        try {
+            const { error } = await supabase.auth.updateUser({
+                email: email,
+                data: {
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone: phone,
+                    nickname: nickname,
+                }
+            });
+
+            if (error) {
+                Alert.alert('Error', error.message);
+                return;
+            }
+
+            await refreshUser();
+            Alert.alert('Success', 'Profile updated successfully', [
+                { text: 'OK', onPress: () => router.back() }
+            ]);
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'An error occurred while saving profile');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -88,7 +119,7 @@ export default function EditProfileScreen() {
                             <View style={tw`items-center mb-10 mt-10`}>
                                 <View style={tw`relative`}>
                                     <Image
-                                        source={{ uri: INITIAL_USER.avatar }}
+                                        source={{ uri: user?.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop' }}
                                         style={tw`w-28 h-28 rounded-full border-2 border-white/20`}
                                     />
                                     <TouchableOpacity
@@ -129,13 +160,25 @@ export default function EditProfileScreen() {
                                     placeholder="Enter email address"
                                     icon={Mail}
                                 />
+                                <EditField
+                                    label="Nickname"
+                                    value={nickname}
+                                    onChangeText={setNickname}
+                                    placeholder="Enter nickname"
+                                    icon={Tag}
+                                />
                             </GlassCard>
 
                             <TouchableOpacity
                                 onPress={handleSave}
-                                style={tw`bg-white/5 py-5 rounded-2xl border border-white/10 items-center`}
+                                disabled={isLoading}
+                                style={tw`bg-white/5 py-5 rounded-2xl border border-white/10 items-center mb-10`}
                             >
-                                <Text style={tw`text-white text-xl font-inter-bold`}>Save Changes</Text>
+                                {isLoading ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <Text style={tw`text-white text-xl font-inter-bold`}>Save Changes</Text>
+                                )}
                             </TouchableOpacity>
                         </ScrollView>
                     </KeyboardAvoidingView>
