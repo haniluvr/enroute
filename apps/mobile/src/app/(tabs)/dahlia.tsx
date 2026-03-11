@@ -501,7 +501,7 @@ export default function DahliaScreen() {
     };
 
     const renderSelectionView = () => (
-        <ScrollView style={tw`flex-1 pt-16`} scrollEnabled={false}>
+        <ScrollView style={tw`flex-1 pt-16`}>
             <View style={tw``}>
                 <TouchableOpacity onPress={() => router.back()} style={tw`mb-6`}>
                     <View style={tw`bg-white/10 p-2.5 rounded-xl border border-white/10 w-11 h-11 items-center justify-center ml-6`}>

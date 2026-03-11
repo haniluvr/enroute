@@ -70,13 +70,13 @@ export default function HomeScreen() {
                         <TouchableOpacity
                             style={tw`w-[48%]`}
                             activeOpacity={0.8}
-                            onPress={() => router.push('/(tabs)/explore')}
+                            onPress={() => router.push('/career-aptitude-test')}
                         >
                             <GlassCard style={tw`h-[140px] p-5 justify-between bg-white/10 shadow-xl border-t border-white/20`} noPadding>
                                 <View style={tw`bg-[#fcfcfc]/20 w-11 h-11 rounded-2xl items-center justify-center`}>
                                     <Telescope color="#fff" size={22} />
                                 </View>
-                                <Text style={tw`text-white font-[InterTight-Medium] text-[15px]`}>Career Interest Test</Text>
+                                <Text style={tw`text-white font-[InterTight-Medium] text-[15px]`}>Career Aptitude Test</Text>
                             </GlassCard>
                         </TouchableOpacity>
                     </View>
