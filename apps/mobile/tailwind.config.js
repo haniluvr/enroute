@@ -1,5 +1,4 @@
-// tailwind.config.js
-
+/** @type {import('tailwindcss').Config} */
 module.exports = {
     content: ["./App.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}"],
     theme: {
@@ -15,10 +14,13 @@ module.exports = {
                 }
             },
             fontFamily: {
-                inter: ['InterTight-Regular', 'sans-serif'],
-                'inter-medium': ['InterTight-Medium', 'sans-serif'],
-                'inter-semibold': ['InterTight-SemiBold', 'sans-serif'],
-                'inter-bold': ['InterTight-Bold', 'sans-serif'],
+                'InterTight': ['InterTight-Regular', 'sans-serif'],
+                'InterTight-Medium': ['InterTight-Medium', 'sans-serif'],
+                'InterTight-SemiBold': ['InterTight-SemiBold', 'sans-serif'],
+                'InterTight-Bold': ['InterTight-Bold', 'sans-serif'],
+            },
+            spacing: {
+                '17': '4.25rem', // Support for pt-17
             }
         },
     },

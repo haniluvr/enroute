@@ -1,6 +1,7 @@
 import tw from '@/lib/tailwind';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Animated } from 'react-native';
-import { ChevronLeft, CheckCircle2 } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, CheckCircle2, ClipboardPen } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
@@ -10,12 +11,26 @@ type ScreenState = 'intro' | 'quiz' | 'result';
 
 export default function CareerAptitudeTestScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [screenState, setScreenState] = useState<ScreenState>('intro');
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
 
     // Progress bar animation
     const progressAnim = useRef(new Animated.Value(0)).current;
+
+    const renderHeader = (title: string, subtitle: string, onBack: () => void) => (
+        <View style={[tw`mt-5 pb-6`, { paddingTop: insets.top }]}>
+            <TouchableOpacity
+                onPress={onBack}
+                style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-6`}
+            >
+                <ChevronLeft color="#ffffff" size={24} />
+            </TouchableOpacity>
+            <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-1`}>{title}</Text>
+            <Text style={tw`text-gray-400 font-[InterTight] text-lg`}>{subtitle}</Text>
+        </View>
+    );
 
     useEffect(() => {
         if (screenState === 'quiz') {
@@ -52,44 +67,47 @@ export default function CareerAptitudeTestScreen() {
     };
 
     const renderIntro = () => (
-        <View style={tw`flex-1 px-6 justify-center items-center pb-20`}>
-            <View style={tw`w-full max-w-sm`}>
-                <View style={tw`items-center mb-10`}>
-                    <Text style={tw`text-white font-[InterTight-Bold] text-4xl text-center mb-4 leading-[44px]`}>
-                        Career Aptitude Test
+        <View style={tw`flex-1 px-6`}>
+            {renderHeader("Career Aptitude Test", "Take a test to enhance your career path", () => router.back())}
+            <View style={tw`bg-white/5 border border-white/10 rounded-3xl overflow-hidden mb-8`}>
+                <View style={tw`items-center justify-center p-6 pb-8`}>
+                    <View style={tw`w-20 h-20 rounded-full bg-white/10 items-center justify-center mb-6`}>
+                        <ClipboardPen color="#fff" size={40} />
+                    </View>
+                    <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center px-4 mb-8`}>
+                        Discover your unique professional profile to help our AI match you with ideal career paths.
                     </Text>
-                    <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-7`}>
-                        Discover your unique professional profile. This carefully designed assessment helps our AI match your work style, skills, and motivations with ideal career paths.
-                    </Text>
-                </View>
 
-                <View style={tw`bg-white/5 border border-white/10 rounded-3xl p-6 mb-10`}>
-                    <View style={tw`flex-row items-center mb-4`}>
-                        <View style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center mr-4`}>
-                            <Text style={tw`text-white font-[InterTight-Bold]`}>20</Text>
+                    <View style={tw`w-full px-2`}>
+                        <View style={tw`flex-row items-center mb-4`}>
+                            <View style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center mr-4`}>
+                                <Text style={tw`text-white font-[InterTight-Bold]`}>20</Text>
+                            </View>
+                            <Text style={tw`text-white text-base font-[InterTight-Medium]`}>Detailed questions</Text>
                         </View>
-                        <Text style={tw`text-white text-base font-[InterTight-Medium]`}>Detailed questions</Text>
-                    </View>
-                    <View style={tw`flex-row items-center mb-4`}>
-                        <View style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center mr-4`}>
-                            <Text style={tw`text-white font-[InterTight-Bold]`}>4</Text>
+                        <View style={tw`flex-row items-center mb-4`}>
+                            <View style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center mr-4`}>
+                                <Text style={tw`text-white font-[InterTight-Bold]`}>4</Text>
+                            </View>
+                            <Text style={tw`text-white text-base font-[InterTight-Medium]`}>Core focus areas</Text>
                         </View>
-                        <Text style={tw`text-white text-base font-[InterTight-Medium]`}>Core focus areas</Text>
-                    </View>
-                    <View style={tw`flex-row items-center`}>
-                        <View style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center mr-4`}>
-                            <Text style={tw`text-white font-[InterTight-Bold]`}>5</Text>
+                        <View style={tw`flex-row items-center`}>
+                            <View style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center mr-4`}>
+                                <Text style={tw`text-white font-[InterTight-Bold]`}>5</Text>
+                            </View>
+                            <Text style={tw`text-white text-base font-[InterTight-Medium]`}>Minutes to complete</Text>
                         </View>
-                        <Text style={tw`text-white text-base font-[InterTight-Medium]`}>Minutes to complete</Text>
                     </View>
                 </View>
-
+            </View>
+            
+            <View style={[tw`absolute bottom-0 left-6 right-6`, { marginBottom: insets.bottom + 12 }]}>
                 <TouchableOpacity
                     style={tw`w-full bg-white py-4 rounded-full items-center shadow-lg`}
                     activeOpacity={0.8}
                     onPress={() => setScreenState('quiz')}
                 >
-                    <Text style={tw`text-black text-lg font-[InterTight-Bold]`}>
+                    <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>
                         Start Now
                     </Text>
                 </TouchableOpacity>
@@ -109,7 +127,7 @@ export default function CareerAptitudeTestScreen() {
         return (
             <View style={tw`flex-1`}>
                 {/* Header & Progress */}
-                <View style={tw`px-6 pt-2 pb-6`}>
+                <View style={tw`px-6 pt-17 pb-6`}>
                     <View style={tw`flex-row items-center justify-between mb-6`}>
                         <TouchableOpacity
                             onPress={handleBack}
@@ -135,10 +153,10 @@ export default function CareerAptitudeTestScreen() {
                     contentContainerStyle={tw`px-6 pb-32`}
                 >
                     <View style={tw`mb-8`}>
-                        <Text style={tw`text-accent-violet/80 font-[InterTight-Bold] text-sm tracking-widest uppercase mb-3`}>
+                        <Text style={tw`text-white/80 font-[InterTight] font-bold text-sm tracking-widest uppercase mb-3`}>
                             {question.section}
                         </Text>
-                        <Text style={tw`text-white font-[InterTight-Bold] text-2xl leading-9`}>
+                        <Text style={tw`text-white font-[InterTight] text-2xl leading-9`}>
                             {question.question}
                         </Text>
                     </View>
@@ -176,7 +194,10 @@ export default function CareerAptitudeTestScreen() {
                 </ScrollView>
 
                 {/* Footer fixed next button */}
-                <View style={tw`absolute bottom-0 left-0 right-0 p-6 pt-4 border-t border-white/5 bg-[#0a0a0a]/90`}>
+                <View style={[
+                    tw`absolute bottom-0 left-0 right-0 px-6 pt-4 border-t border-white/5 bg-[#0a0a0a]/90`,
+                    { paddingBottom: insets.bottom + 16 }
+                ]}>
                     <TouchableOpacity
                         disabled={!isAnswered}
                         style={[
@@ -187,7 +208,7 @@ export default function CareerAptitudeTestScreen() {
                         onPress={handleNext}
                     >
                         <Text style={[
-                            tw`text-lg font-[InterTight-Bold]`,
+                            tw`text-lg font-[InterTight] font-medium`,
                             isAnswered ? tw`text-black` : tw`text-white/30`
                         ]}>
                             {currentStep === CAREER_APTITUDE_QUESTIONS.length - 1 ? 'Complete Test' : 'Next'}
@@ -199,7 +220,7 @@ export default function CareerAptitudeTestScreen() {
     };
 
     const renderResult = () => (
-        <View style={tw`flex-1 px-6 justify-center items-center pb-20`}>
+        <View style={[tw`flex-1 px-6 justify-center items-center`, { paddingBottom: insets.bottom + 20 }]}>
             <View style={tw`w-20 h-20 rounded-full bg-white/10 items-center justify-center mb-8 border border-white/20`}>
                 <CheckCircle2 size={40} color="#ffffff" />
             </View>
@@ -224,23 +245,11 @@ export default function CareerAptitudeTestScreen() {
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
-            <SafeAreaView style={tw`flex-1`}>
-                {screenState === 'intro' && (
-                    <View style={tw`px-6 pt-4`}>
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center`}
-                        >
-                            <ChevronLeft color="#ffffff" size={24} />
-                        </TouchableOpacity>
-                    </View>
-                )}
-
+            <View style={tw`flex-1`}>
                 {screenState === 'intro' && renderIntro()}
                 {screenState === 'quiz' && renderQuiz()}
                 {screenState === 'result' && renderResult()}
-
-            </SafeAreaView>
+            </View>
         </GlassBackground>
     );
 }

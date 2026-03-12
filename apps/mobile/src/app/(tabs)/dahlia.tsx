@@ -501,23 +501,17 @@ export default function DahliaScreen() {
     };
 
     const renderSelectionView = () => (
-        <ScrollView style={tw`flex-1 pt-16`}>
-            <View style={tw``}>
-                <TouchableOpacity onPress={() => router.back()} style={tw`mb-6`}>
-                    <View style={tw`bg-white/10 p-2.5 rounded-xl border border-white/10 w-11 h-11 items-center justify-center ml-6`}>
-                        <ChevronLeft color="#aaa" size={24} />
-                    </View>
-                </TouchableOpacity>
-
+        <ScrollView style={tw`flex-1 pt-10`}>
+            <View style={tw`pt-6`}>
                 <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-1 px-6`}>Choose your career coach</Text>
-                <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-6 px-6`}>Who do you want to talk to today?</Text>
+                <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-12 px-6`}>Who do you want to talk to today?</Text>
 
                 <View style={tw`px-6`}>
                     {renderCoachCard(selectedPersona, true)}
                 </View>
 
                 <Text style={tw`text-gray-300 font-[InterTight] font-medium text-xl mb-4 px-6`}>Other coaches</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-4 pl-6`}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-8 pl-6`}>
                     {PERSONAS.filter(p => p.id !== selectedPersona.id).map(persona => (
                         <View key={persona.id}>
                             {renderCoachCard(persona)}

@@ -39,7 +39,7 @@ function InitialLayout() {
 
         const inAuthGroup = segments[0] === '(auth)';
         const inOnboarding = !segments[0] || segments[0] === 'onboarding' || segments[0] === 'index' || segments[0] === 'auth-selection';
-        const isProtectedHeader = segments[0] === '(tabs)' || segments[0] === 'settings' || segments[0] === 'career-interest-test';
+        const isProtectedHeader = segments[0] === '(tabs)' || segments[0] === 'settings' || segments[0] === 'career-aptitude-test';
 
         if (!user && isProtectedHeader) {
             // If not logged in and trying to access protected routes, redirect to auth-selection
@@ -70,7 +70,7 @@ function InitialLayout() {
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="career-interest-test" options={{ headerShown: false }} />
+            <Stack.Screen name="career-aptitude-test" options={{ headerShown: false }} />
         </Stack>
     );
 }
