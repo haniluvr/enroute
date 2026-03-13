@@ -16,7 +16,7 @@ import { pathIconMap } from '@/components/path/pathIconMap';
 import { useState } from 'react';
 
 export default function CareerDetailsScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id, fromRoadmap } = useLocalSearchParams<{ id: string, fromRoadmap?: string }>();
     const router = useRouter();
     const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
 
@@ -28,7 +28,7 @@ export default function CareerDetailsScreen() {
                 <SafeAreaView style={tw`flex-1`}>
                     <View style={tw`px-6 pt-4`}>
                         <TouchableOpacity
-                            onPress={() => router.back()}
+                            onPress={() => fromRoadmap === 'true' ? router.navigate('/roadmap' as any) : router.back()}
                             style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-8`}
                         >
                             <ChevronLeft color="#ffffff" size={24} />
@@ -52,7 +52,7 @@ export default function CareerDetailsScreen() {
                 <View style={tw`px-6 pt-16 pb-20`}>
                     {/* Back Button */}
                     <TouchableOpacity
-                        onPress={() => router.back()}
+                        onPress={() => fromRoadmap === 'true' ? router.navigate('/roadmap' as any) : router.back()}
                         style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-6`}
                     >
                         <ChevronLeft color="#ffffff" size={24} />
