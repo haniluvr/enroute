@@ -1,8 +1,8 @@
 import tw from '@/lib/tailwind';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert, Share, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert, Share } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Check, Download, BookmarkPlus, Clock, DollarSign, TrendingUp, ChevronRight, Bookmark, Share2, Calendar, Loader, Lightbulb, FileText } from 'lucide-react-native';
+import { ChevronLeft, Check, Download, BookmarkPlus, Clock, DollarSign, TrendingUp, ChevronRight, Bookmark, Share2, Calendar, Loader } from 'lucide-react-native';
 import { useState } from 'react';
 import { BlurView } from 'expo-blur';
 
@@ -40,8 +40,8 @@ export default function RoadmapScreen() {
                 steps: [
                     { id: '1', title: 'Frontend Fundamentals', description: 'Master HTML, CSS, JavaScript basics and advanced concepts.' },
                     { id: '2', title: 'React Framework', description: 'Build dynamic UIs with React, hooks, and state management.' },
-                    { id: '1', title: 'Backend APIs', description: 'Learn Node.js, Express, and RESTful API design.' },
-                    { id: '2', title: 'Database Construction', description: 'Understand SQL and NoSQL databases like PostgreSQL and MongoDB.' },
+                    { id: '3', title: 'Backend APIs', description: 'Learn Node.js, Express, and RESTful API design.' },
+                    { id: '4', title: 'Database Construction', description: 'Understand SQL and NoSQL databases like PostgreSQL and MongoDB.' },
                     { id: '1', title: 'Deployment & CI/CD', description: 'Get familiar with Git, Docker, and AWS deploying workflows.' }
                 ]
             });
@@ -132,13 +132,9 @@ export default function RoadmapScreen() {
                         <View>
                             {roadmapData.steps.map((step: any, index: number) => (
                                 <TouchableOpacity 
-                                    activeOpacity={0.8}
-                                    onPress={() => router.push({
-                                        pathname: `/(tabs)/path/career-details/${step.id}`,
-                                        params: { fromRoadmap: 'true' }
-                                    } as any)}
                                     key={index} 
                                     style={tw`p-5 bg-white/10 border border-white/10 rounded-3xl mb-4 overflow-hidden`}
+                                    onPress={() => router.push(`/roadmap-details/${step.id}`)}
                                 >
                                     <View style={tw`flex-row justify-between items-start mb-3`}>
                                         <View style={tw`bg-[#2b4e50] px-3 py-1.5 rounded-full border border-white/10 flex-row items-center`}>

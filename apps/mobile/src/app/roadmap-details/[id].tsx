@@ -7,20 +7,19 @@ import {
     SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, Lightbulb, Calendar, Download, FileText, Video, Wrench, Star, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, GraduationCap, Calendar, Download, FileText, Video, Wrench, Star, ChevronRight } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
-import { GlassButton } from '@/components/GlassButton';
 import { careerDetailsMap } from '@/data/pathMockData';
 import { pathIconMap } from '@/components/path/pathIconMap';
 import { useState } from 'react';
 
-export default function CareerDetailsScreen() {
+export default function RoadmapDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
 
-    const career = id ? careerDetailsMap[id] : null;
+    const career = id ? careerDetailsMap[id as keyof typeof careerDetailsMap] : null;
 
     if (!career) {
         return (
@@ -33,7 +32,7 @@ export default function CareerDetailsScreen() {
                         >
                             <ChevronLeft color="#ffffff" size={24} />
                         </TouchableOpacity>
-                        <Text style={tw`text-gray-400 font-[InterTight]`}>Career not found.</Text>
+                        <Text style={tw`text-gray-400 font-[InterTight]`}>Course not found.</Text>
                     </View>
                 </SafeAreaView>
             </GlassBackground>
@@ -60,22 +59,22 @@ export default function CareerDetailsScreen() {
 
                     {/* Header */}
                     <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-2`}>
-                        Career details
+                        Your learning roadmap
                     </Text>
                     <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-4`}>
                         Learn, practice, and grow with resources tailored for this role
                     </Text>
-                    <Text style={tw`text-gray-300 font-[InterTight] font-medium text-lg mb-8`}>
-                        Becoming a {career.title}
+                    <Text style={tw`text-white/80 font-[InterTight-Medium] text-xl mb-8`}>
+                        {career.title} path
                     </Text>
 
-                    {/* Card 1: Role Overview */}
+                    {/* Card 1: Course Overview */}
                     <GlassCard style={tw`p-5 bg-white/10 border-t border-white/20 mb-4`} noPadding>
                         <View style={tw`flex-row items-center mb-4`}>
-                            <View style={tw`bg-[#FF9500]/20 px-3 py-1.5 rounded-full flex-row items-center border border-[#FF9500]/60 mr-2`}>
-                                <Lightbulb color="#FF9500" size={14} style={tw`mr-1.5`} />
-                                <Text style={tw`text-[#FF9500] font-[InterTight-Medium] text-sm`}>
-                                    Role overview
+                            <View style={tw`bg-[#f43f5e]/20 px-3 py-1.5 rounded-full flex-row items-center border border-[#f43f5e]/60 mr-2`}>
+                                <GraduationCap color="#f43f5e" size={14} style={tw`mr-1.5`} />
+                                <Text style={tw`text-[#f43f5e] font-[InterTight-Medium] text-sm`}>
+                                    Course overview
                                 </Text>
                             </View>
                         </View>
@@ -91,7 +90,7 @@ export default function CareerDetailsScreen() {
                         </View>
                         <View style={tw`bg-white/5 rounded-xl p-4`}>
                             <View style={tw`flex-row items-center mb-2`}>
-                                <Lightbulb color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <GraduationCap color="#fcfcfc80" size={16} style={tw`mr-2`} />
                                 <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
                                     Job Demand: {career.jobDemand}
                                 </Text>
@@ -232,7 +231,7 @@ export default function CareerDetailsScreen() {
                                 </TouchableOpacity>
                             </View>
 
-                            {career.reviews.map((review) => {
+                            {career.reviews.map((review: any) => {
                                 const isExpanded = expandedReviews[review.id];
                                 return (
                                     <View key={review.id} style={tw`mb-4`}>
@@ -292,7 +291,7 @@ export default function CareerDetailsScreen() {
                             style={tw`w-full bg-white py-4 rounded-full items-center justify-center mb-4`}
                         >
                             <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>
-                                Download resources
+                                Start learning
                             </Text>
                         </TouchableOpacity>
 
@@ -301,7 +300,7 @@ export default function CareerDetailsScreen() {
                             style={tw`w-full py-4 rounded-full items-center justify-center border border-white/25 bg-transparent`}
                         >
                             <Text style={tw`text-white text-lg font-[InterTight] font-semibold`}>
-                                Save path
+                                Save module
                             </Text>
                         </TouchableOpacity>
                     </View>
