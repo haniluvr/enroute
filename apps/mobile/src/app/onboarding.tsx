@@ -4,12 +4,12 @@ import {
 } from 'react-native';
 import Animated, {
     useSharedValue, useAnimatedStyle, withTiming, withSpring,
-    runOnJS, interpolate, Extrapolation
+    runOnJS, interpolate, Extrapolation, SharedValue
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { AnimatedGradient } from '@/components/AnimatedGradient';
 import { router } from 'expo-router';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,72 +40,138 @@ const SCALE_DOWN_PER_CARD = 0.05;
 
 // The threshold distance for a swipe to be considered "completed"
 const SWIPE_THRESHOLD = width * 0.35;
+const OnboardingCard = ({
+    slide,
+    index,
+    globalActiveIndex,
+    isLastSlide,
+    onSwipeComplete,
+}: {
+    slide: typeof SLIDES[0];
+    index: number;
+    globalActiveIndex: SharedValue<number>;
+    isLastSlide: boolean;
+    onSwipeComplete: () => void;
+}) => {
+    const localTranslateX = useSharedValue(0);
+    const localTranslateY = useSharedValue(0);
+    const isInteracting = useSharedValue(false);
 
-export default function OnboardingScreen() {
-    // We maintain a sliding window of the slides array
-    const [cardOrder, setCardOrder] = useState<typeof SLIDES>([...SLIDES]);
-    // The total "progress" through the deck (for the progress indicator)
-    const [progressIndex, setProgressIndex] = useState(0);
+    const gesture = Gesture.Pan()
+        .enabled(!isLastSlide)
+        .onStart(() => {
+            // Only allow interaction if this is the current top card
+            const currentFloatIndex = Math.abs(globalActiveIndex.value - index);
+            if (currentFloatIndex < 0.1) {
+                isInteracting.value = true;
+            }
+        })
+        .onUpdate((event) => {
+            if (!isInteracting.value) return;
+            localTranslateX.value = event.translationX;
+            localTranslateY.value = event.translationY;
+            
+            // Advance the background cards as we drag
+            const progress = Math.abs(event.translationX) / SWIPE_THRESHOLD;
+            globalActiveIndex.value = index + Math.min(progress, 1);
+        })
+        .onEnd((event) => {
+            if (!isInteracting.value) return;
+            isInteracting.value = false;
 
-    const isLastCard = progressIndex >= SLIDES.length - 1;
-
-    // The shared values track the pan gesture of the TOP card
-    const translationX = useSharedValue(0);
-    const translationY = useSharedValue(0);
-
-    // Moves the top card to the back of the deck (infinite loop)
-    const cycleTopCard = useCallback(() => {
-        setCardOrder((prev) => {
-            const next = [...prev];
-            const topCard = next.shift();
-            if (topCard) next.push(topCard);
-            return next;
+            if (Math.abs(event.translationX) > SWIPE_THRESHOLD || Math.abs(event.velocityX) > 800) {
+                const direction = Math.sign(event.translationX);
+                // Animate to the next card globally
+                localTranslateX.value = withTiming(direction * (width + 100), { duration: 250 });
+                globalActiveIndex.value = withTiming(index + 1, { duration: 250 }, () => {
+                    runOnJS(onSwipeComplete)();
+                });
+            } else {
+                // Snap back
+                localTranslateX.value = withSpring(0);
+                localTranslateY.value = withSpring(0);
+                globalActiveIndex.value = withSpring(index);
+            }
         });
 
-        if (progressIndex < SLIDES.length - 1) {
-            setProgressIndex(prev => prev + 1);
+    const animatedStyle = useAnimatedStyle(() => {
+        const floatIndex = index - globalActiveIndex.value;
+
+        // Swiped away card
+        if (floatIndex < 0) {
+            const rotateZ = interpolate(
+                localTranslateX.value,
+                [-width / 2, width / 2],
+                [-8, 8],
+                Extrapolation.CLAMP
+            );
+            return {
+                transform: [
+                    { translateX: localTranslateX.value },
+                    { translateY: localTranslateY.value },
+                    { rotateZ: `${rotateZ}deg` }
+                ],
+                zIndex: 100,
+                opacity: interpolate(floatIndex, [-1, 0], [0, 1])
+            };
         }
 
-        // Instantly reset the pan values since the physical top card component has changed
-        translationX.value = 0;
-        translationY.value = 0;
-    }, [progressIndex, translationX, translationY]);
+        // Stacked card
+        return {
+            transform: [
+                { scale: Math.max(0, 1 - (floatIndex * SCALE_DOWN_PER_CARD)) },
+                { translateY: floatIndex * Y_OFFSET_PER_CARD }
+            ],
+            zIndex: 100 - index,
+            opacity: floatIndex >= VISIBLE_CARDS ? 0 : 1
+        };
+    });
+
+    return (
+        <GestureDetector gesture={gesture}>
+            <Animated.View style={[styles.cardContainer, animatedStyle]}>
+                <View style={styles.card}>
+                    <AnimatedGradient
+                        colors={['#6d3659', '#af88ad', '#2b4e50', '#111111']}
+                        style={StyleSheet.absoluteFill}
+                    />
+                    <Image source={slide.image} style={styles.cardImage} resizeMode="contain" />
+                    <View style={styles.cardTextContainer}>
+                        <Text style={tw`text-4xl text-white font-[InterTight] font-semibold text-left leading-10`}>
+                            {slide.title}
+                        </Text>
+                    </View>
+                </View>
+            </Animated.View>
+        </GestureDetector>
+    );
+};
+
+export default function OnboardingScreen() {
+    const [progressIndex, setProgressIndex] = useState(0);
+    const globalActiveIndex = useSharedValue(0);
+
+    const isLastSlide = progressIndex >= SLIDES.length - 1;
+
+    const handleSwipeComplete = useCallback(() => {
+        setProgressIndex(prev => prev + 1);
+    }, []);
 
     const handleContinue = () => {
-        if (progressIndex >= SLIDES.length - 1) {
+        if (isLastSlide) {
             router.push('/auth-selection');
             return;
         }
 
-        // Programmatic swipe right
-        translationX.value = withTiming(width + 100, { duration: 300 }, () => {
-            runOnJS(cycleTopCard)();
+        // Animate promotion via the global index
+        globalActiveIndex.value = withTiming(progressIndex + 1, { duration: 300 }, () => {
+            runOnJS(handleSwipeComplete)();
         });
     };
 
     const handleSkip = () => {
         router.push('/auth-selection');
     };
-
-    const panGesture = Gesture.Pan()
-        .onUpdate((event) => {
-            translationX.value = event.translationX;
-            translationY.value = event.translationY;
-        })
-        .onEnd((event) => {
-            // Check if swiped far enough left or right AND we are not on the last card
-            if (!isLastCard && (Math.abs(event.translationX) > SWIPE_THRESHOLD || Math.abs(event.velocityX) > 800)) {
-                // Fling off screen
-                const direction = Math.sign(event.translationX) || (event.velocityX > 0 ? 1 : -1);
-                translationX.value = withTiming(direction * (width + 100), { duration: 250 }, () => {
-                    runOnJS(cycleTopCard)();
-                });
-            } else {
-                // Spring back to center (always happens on the last card)
-                translationX.value = withSpring(0, { damping: 15 });
-                translationY.value = withSpring(0, { damping: 15 });
-            }
-        });
 
     return (
         <View style={{ flex: 1, backgroundColor: '#111111' }}>
@@ -132,73 +198,19 @@ export default function OnboardingScreen() {
 
                 {/* Card Deck Area */}
                 <View style={styles.deckWrapper}>
-                    {/* Render from back to front */}
-                    {cardOrder.map((slide, i) => {
-                        // Only render the top VISIBLE_CARDS
-                        if (i >= VISIBLE_CARDS) return null;
-
-                        // Is this the top card actively being interacted with?
-                        const isTopCard = i === 0;
-
-                        // Calculate dynamic styles based on stack order
-                        const animatedStyle = useAnimatedStyle(() => {
-                            // If this is the top card, use the raw pan gesture
-                            if (isTopCard) {
-                                // Add a slight tilt based on X translation (10 degrees max)
-                                const rotateZ = interpolate(
-                                    translationX.value,
-                                    [-width / 2, width / 2],
-                                    [-8, 8],
-                                    Extrapolation.CLAMP
-                                );
-                                return {
-                                    transform: [
-                                        { translateX: translationX.value },
-                                        { translateY: translationY.value },
-                                        { rotateZ: `${rotateZ}deg` }
-                                    ],
-                                    zIndex: 100 - i
-                                };
-                            }
-
-                            // If this is a background card, it moves upward into the next slot 
-                            // as the top card is dragged horizontally away from center
-                            // If we are on the last card, we don't animate background cards up
-                            const dragDistance = isLastCard ? 0 : Math.abs(translationX.value);
-                            const animationProgress = Math.min(dragDistance / SWIPE_THRESHOLD, 1);
-
-                            // The card's "virtual" index floats between its actual index `i` 
-                            // and the next index up `i - 1` as the user drags
-                            const floatIndex = i - animationProgress;
-
-                            return {
-                                transform: [
-                                    { scale: Math.max(0, 1 - (floatIndex * SCALE_DOWN_PER_CARD)) },
-                                    { translateY: floatIndex * Y_OFFSET_PER_CARD }
-                                ],
-                                zIndex: 100 - i,
-                                // Only hide the card if it's strictly beyond the visible count
-                                opacity: floatIndex >= VISIBLE_CARDS ? 0 : 1
-                            };
-                        });
-
+                    {SLIDES.map((slide, i) => {
+                        // Only render the window of visible cards
+                        if (i < progressIndex - 1 || i > progressIndex + VISIBLE_CARDS) return null;
+                        
                         return (
-                            <GestureDetector key={slide.id} gesture={isTopCard ? panGesture : Gesture.Native()}>
-                                <Animated.View style={[styles.cardContainer, animatedStyle]}>
-                                    <View style={styles.card}>
-                                        <AnimatedGradient
-                                            colors={['#6d3659', '#af88ad', '#2b4e50', '#111111']}
-                                            style={StyleSheet.absoluteFill}
-                                        />
-                                        <Image source={slide.image} style={styles.cardImage} resizeMode="contain" />
-                                        <View style={styles.cardTextContainer}>
-                                            <Text style={tw`text-4xl text-white font-[InterTight] font-semibold text-left leading-10`}>
-                                                {slide.title}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </Animated.View>
-                            </GestureDetector>
+                            <OnboardingCard
+                                key={slide.id}
+                                slide={slide}
+                                index={i}
+                                globalActiveIndex={globalActiveIndex}
+                                isLastSlide={isLastSlide}
+                                onSwipeComplete={handleSwipeComplete}
+                            />
                         );
                     }).reverse()}
                 </View>
@@ -211,7 +223,7 @@ export default function OnboardingScreen() {
                         style={tw`w-full bg-white py-4 rounded-full items-center justify-center mb-4`}
                     >
                         <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>
-                            {isLastCard ? 'Get started' : 'Continue'}
+                            {isLastSlide ? 'Get started' : 'Continue'}
                         </Text>
                     </TouchableOpacity>
 

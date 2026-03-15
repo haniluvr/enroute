@@ -13,6 +13,7 @@ import {
     Dimensions,
     KeyboardAvoidingView,
     Platform,
+    Keyboard,
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
 import { router } from 'expo-router';
@@ -203,6 +204,14 @@ export default function SignUpScreen() {
     const [nickname, setNickname] = useState('');
     const [careerInterest, setCareerInterest] = useState('');
     const [currentLevel, setCurrentLevel] = useState('');
+
+    const firstNameRef = useRef<TextInput>(null);
+    const lastNameRef = useRef<TextInput>(null);
+    const emailRef = useRef<TextInput>(null);
+    const phoneRef = useRef<TextInput>(null);
+    const passwordRef = useRef<TextInput>(null);
+    const confirmPasswordRef = useRef<TextInput>(null);
+    const nicknameRef = useRef<TextInput>(null);
 
     // Shared
     const [isLoading, setIsLoading] = useState(false);
@@ -418,34 +427,83 @@ export default function SignUpScreen() {
 
                                 <FormField label="First Name">
                                     <View style={[styles.inputRow, firstNameError && { borderColor: '#FF453A' }]}>
-                                        <TextInput style={styles.input} placeholder="Enter first name" placeholderTextColor="#666" value={firstName} onChangeText={(t) => { setFirstName(t); if (firstNameError) setFirstNameError(''); }} />
+                                        <TextInput 
+                                            ref={firstNameRef}
+                                            style={styles.input} 
+                                            placeholder="Enter first name" 
+                                            placeholderTextColor="#666" 
+                                            value={firstName} 
+                                            onChangeText={(t) => { setFirstName(t); if (firstNameError) setFirstNameError(''); }}
+                                            returnKeyType="next"
+                                            onSubmitEditing={() => lastNameRef.current?.focus()}
+                                        />
                                     </View>
                                     {firstNameError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{firstNameError}</Text> : null}
                                 </FormField>
 
                                 <FormField label="Last Name">
                                     <View style={[styles.inputRow, lastNameError && { borderColor: '#FF453A' }]}>
-                                        <TextInput style={styles.input} placeholder="Enter last name" placeholderTextColor="#666" value={lastName} onChangeText={(t) => { setLastName(t); if (lastNameError) setLastNameError(''); }} />
+                                        <TextInput 
+                                            ref={lastNameRef}
+                                            style={styles.input} 
+                                            placeholder="Enter last name" 
+                                            placeholderTextColor="#666" 
+                                            value={lastName} 
+                                            onChangeText={(t) => { setLastName(t); if (lastNameError) setLastNameError(''); }}
+                                            returnKeyType="next"
+                                            onSubmitEditing={() => emailRef.current?.focus()}
+                                        />
                                     </View>
                                     {lastNameError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{lastNameError}</Text> : null}
                                 </FormField>
 
                                 <FormField label="Email Address">
                                     <View style={[styles.inputRow, emailError && { borderColor: '#FF453A' }]}>
-                                        <TextInput style={styles.input} placeholder="Enter email address" placeholderTextColor="#666" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={(t) => { setEmail(t); if (emailError) setEmailError(''); }} />
+                                        <TextInput 
+                                            ref={emailRef}
+                                            style={styles.input} 
+                                            placeholder="Enter email address" 
+                                            placeholderTextColor="#666" 
+                                            keyboardType="email-address" 
+                                            autoCapitalize="none" 
+                                            value={email} 
+                                            onChangeText={(t) => { setEmail(t); if (emailError) setEmailError(''); }}
+                                            returnKeyType="next"
+                                            onSubmitEditing={() => phoneRef.current?.focus()}
+                                        />
                                     </View>
                                     {emailError ? <Text style={tw`text-[#FF453A] text-xs mt-1 ml-1`}>{emailError}</Text> : null}
                                 </FormField>
 
                                 <FormField label="Phone Number (Optional)">
                                     <View style={styles.inputRow}>
-                                        <TextInput style={styles.input} placeholder="Enter phone number" placeholderTextColor="#666" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+                                        <TextInput 
+                                            ref={phoneRef}
+                                            style={styles.input} 
+                                            placeholder="Enter phone number" 
+                                            placeholderTextColor="#666" 
+                                            keyboardType="phone-pad" 
+                                            value={phone} 
+                                            onChangeText={setPhone}
+                                            returnKeyType="next"
+                                            onSubmitEditing={() => passwordRef.current?.focus()}
+                                        />
                                     </View>
                                 </FormField>
 
                                 <FormField label="Password">
                                     <View style={[styles.inputRow, tw`relative justify-center`, passwordError && { borderColor: '#FF453A' }]}>
-                                        <TextInput style={styles.input} placeholder="Enter password (min 6 chars)" placeholderTextColor="#666" secureTextEntry={!showPassword} value={password} onChangeText={(t) => { setPassword(t); if (passwordError) setPasswordError(''); }} />
+                                        <TextInput 
+                                            ref={passwordRef}
+                                            style={styles.input} 
+                                            placeholder="Enter password (min 6 chars)" 
+                                            placeholderTextColor="#666" 
+                                            secureTextEntry={!showPassword} 
+                                            value={password} 
+                                            onChangeText={(t) => { setPassword(t); if (passwordError) setPasswordError(''); }}
+                                            returnKeyType="next"
+                                            onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                                        />
                                         <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                             {showPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
                                         </TouchableOpacity>
@@ -457,7 +515,17 @@ export default function SignUpScreen() {
                                 {password.length > 0 && (
                                     <FormField label="Confirm Password">
                                         <View style={[styles.inputRow, tw`relative justify-center`, (passwordMismatch || confirmPasswordError) && { borderColor: '#FF453A' }]}>
-                                            <TextInput style={styles.input} placeholder="Enter password" placeholderTextColor="#666" secureTextEntry={!showConfirmPassword} value={confirmPassword} onChangeText={(t) => { setConfirmPassword(t); if (confirmPasswordError) setConfirmPasswordError(''); }} />
+                                            <TextInput 
+                                                ref={confirmPasswordRef}
+                                                style={styles.input} 
+                                                placeholder="Enter password" 
+                                                placeholderTextColor="#666" 
+                                                secureTextEntry={!showConfirmPassword} 
+                                                value={confirmPassword} 
+                                                onChangeText={(t) => { setConfirmPassword(t); if (confirmPasswordError) setConfirmPasswordError(''); }}
+                                                returnKeyType="go"
+                                                onSubmitEditing={handleNextStep1}
+                                            />
                                             <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={tw`absolute right-4`} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                                                 {showConfirmPassword ? <EyeOff color="#666" size={20} /> : <Eye color="#666" size={20} />}
                                             </TouchableOpacity>
@@ -544,7 +612,16 @@ export default function SignUpScreen() {
 
                             <FormField label="Nickname (Optional)">
                                 <View style={styles.inputRow}>
-                                    <TextInput style={styles.input} placeholder="Enter nickname" placeholderTextColor="#666" value={nickname} onChangeText={setNickname} />
+                                    <TextInput 
+                                        ref={nicknameRef}
+                                        style={styles.input} 
+                                        placeholder="Enter nickname" 
+                                        placeholderTextColor="#666" 
+                                        value={nickname} 
+                                        onChangeText={setNickname}
+                                        returnKeyType="done"
+                                        onSubmitEditing={() => Keyboard.dismiss()}
+                                    />
                                 </View>
                             </FormField>
 

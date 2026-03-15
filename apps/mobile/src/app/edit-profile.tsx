@@ -16,6 +16,9 @@ interface EditFieldProps {
     placeholder: string;
     icon: any;
     secureTextEntry?: boolean;
+    returnKeyType?: 'done' | 'next' | 'go' | 'search' | 'send';
+    onSubmitEditing?: () => void;
+    inputRef?: React.RefObject<TextInput | null>;
 }
 
 const EditField = ({
@@ -24,13 +27,17 @@ const EditField = ({
     onChangeText,
     placeholder,
     icon: Icon,
-    secureTextEntry = false
+    secureTextEntry = false,
+    returnKeyType,
+    onSubmitEditing,
+    inputRef
 }: EditFieldProps) => (
     <View style={tw`mb-6`}>
         <Text style={tw`text-white/60 text-sm font-[InterTight] font-medium mb-2 ml-1`}>{label}</Text>
         <View style={tw`flex-row items-center bg-white/5 rounded-2xl border border-white/10 px-4 h-[54px]`}>
             <Icon size={20} color="rgba(255,255,255,0.4)" style={tw`mr-3`} />
             <TextInput
+                ref={inputRef}
                 style={[tw`flex-1 text-white text-base font-[InterTight] p-0`, { lineHeight: undefined }]}
                 value={value}
                 onChangeText={onChangeText}
@@ -38,6 +45,8 @@ const EditField = ({
                 placeholderTextColor="rgba(255,255,255,0.3)"
                 secureTextEntry={secureTextEntry}
                 textAlignVertical="center"
+                returnKeyType={returnKeyType}
+                onSubmitEditing={onSubmitEditing}
             />
         </View>
     </View>
@@ -51,6 +60,12 @@ export default function EditProfileScreen() {
     const [email, setEmail] = useState('');
     const [nickname, setNickname] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    const firstNameRef = React.useRef<TextInput>(null);
+    const lastNameRef = React.useRef<TextInput>(null);
+    const phoneRef = React.useRef<TextInput>(null);
+    const emailRef = React.useRef<TextInput>(null);
+    const nicknameRef = React.useRef<TextInput>(null);
 
     useEffect(() => {
         if (user) {
@@ -133,39 +148,54 @@ export default function EditProfileScreen() {
 
                             <GlassCard noPadding style={tw`bg-white/5 border-white/5 mb-8 pt-5 px-5`}>
                                 <EditField
+                                    inputRef={firstNameRef}
                                     label="First Name"
                                     value={firstName}
                                     onChangeText={setFirstName}
                                     placeholder="Enter first name"
                                     icon={User}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => lastNameRef.current?.focus()}
                                 />
                                 <EditField
+                                    inputRef={lastNameRef}
                                     label="Last Name"
                                     value={lastName}
                                     onChangeText={setLastName}
                                     placeholder="Enter last name"
                                     icon={User}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => phoneRef.current?.focus()}
                                 />
                                 <EditField
+                                    inputRef={phoneRef}
                                     label="Phone Number"
                                     value={phone}
                                     onChangeText={setPhone}
                                     placeholder="Enter phone number"
                                     icon={Phone}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => emailRef.current?.focus()}
                                 />
                                 <EditField
+                                    inputRef={emailRef}
                                     label="Email"
                                     value={email}
                                     onChangeText={setEmail}
                                     placeholder="Enter email address"
                                     icon={Mail}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => nicknameRef.current?.focus()}
                                 />
                                 <EditField
+                                    inputRef={nicknameRef}
                                     label="Nickname"
                                     value={nickname}
                                     onChangeText={setNickname}
                                     placeholder="Enter nickname"
                                     icon={Tag}
+                                    returnKeyType="done"
+                                    onSubmitEditing={() => Alert.alert('Action', 'Press Save Changes to update your profile')}
                                 />
                             </GlassCard>
 

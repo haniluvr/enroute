@@ -10,7 +10,10 @@ import {
     TextInput,
     KeyboardAvoidingView,
     Platform,
-    Keyboard
+    Keyboard,
+    Alert,
+    Modal,
+    Pressable
 } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
@@ -27,8 +30,15 @@ import {
     Pause,
     Circle,
     User,
-    ArrowRight
+    ArrowRight,
+    Camera,
+    Image as ImageIcon,
+    FileText,
+    X as CloseIcon,
+    Paperclip
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useState, useEffect, useRef } from 'react';
 import Animated, {
     useSharedValue,
@@ -56,6 +66,7 @@ type FlowState = 'IDLE' | 'RECORDING' | 'PROCESSING' | 'REFINE';
 export default function RecordIdeaScreen() {
     const router = useRouter();
     const [state, setState] = useState<FlowState>('IDLE');
+    const [showUploadModal, setShowUploadModal] = useState(false);
     const [seconds, setSeconds] = useState(0);
     const [transcription, setTranscription] = useState("I'm thinking about transitioning into UI Engineering. I have a strong background in backend development but I've always been more interested in the visual and interactive side of things. I want to build premium experiences.");
     const [messages, setMessages] = useState<Message[]>([
@@ -111,6 +122,57 @@ export default function RecordIdeaScreen() {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const handleRestart = () => {
+        if (state === 'REFINE') {
+            Alert.alert(
+                "Restart Recording",
+                "Would you like to save the current conversation before restarting?",
+                [
+                    {
+                        text: "Yes, Save",
+                        onPress: () => {
+                            handleSave();
+                            setState('IDLE');
+                        }
+                    },
+                    {
+                        text: "No, Just Restart",
+                        onPress: () => setState('IDLE'),
+                        style: "destructive"
+                    },
+                    {
+                        text: "Cancel",
+                        style: "cancel"
+                    }
+                ]
+            );
+        } else {
+            setState('IDLE');
+        }
+    };
+
+    const handleSave = () => {
+        Alert.alert("Success", "Idea saved to your library.");
+    };
+
+    const handleFileUpload = async (type: 'photos' | 'camera' | 'files') => {
+        setShowUploadModal(false);
+        try {
+            if (type === 'photos') {
+                const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+                if (!result.canceled) Alert.alert("Upload", "Image uploaded to chat.");
+            } else if (type === 'camera') {
+                const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+                if (!result.canceled) Alert.alert("Upload", "Photo uploaded to chat.");
+            } else if (type === 'files') {
+                const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+                if (!result.canceled) Alert.alert("Upload", "File uploaded to chat.");
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     const handleSendMessage = () => {
         if (!inputText.trim()) return;
 
@@ -158,6 +220,7 @@ export default function RecordIdeaScreen() {
             </View>
 
             <TouchableOpacity
+                onPress={handleRestart}
                 style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
                 activeOpacity={0.7}
             >
@@ -269,9 +332,15 @@ export default function RecordIdeaScreen() {
                         {/* Input Area */}
                         <BlurView intensity={30} tint="dark" style={tw`absolute bottom-0 left-0 right-0 p-6 pt-4 border-t border-white/10`}>
                             <View style={tw`flex-row items-center gap-3`}>
-                                <View style={tw`flex-1 flex-row items-center bg-white/10 border border-white/20 rounded-full px-5 py-1`}>
+                                <View style={tw`flex-1 flex-row items-center bg-white/5 border border-white/10 rounded-full p-2`}>
+                                    <TouchableOpacity 
+                                        onPress={() => setShowUploadModal(true)} 
+                                        style={tw`p-2`}
+                                    >
+                                        <Paperclip color="#aaa" size={20} />
+                                    </TouchableOpacity>
                                     <TextInput
-                                        style={tw`flex-1 text-white font-[InterTight] text-base py-3`}
+                                        style={tw`flex-1 text-white font-[InterTight] text-[15px] px-2 py-3`}
                                         placeholder="Add more details..."
                                         placeholderTextColor="rgba(255,255,255,0.4)"
                                         value={inputText}
@@ -281,18 +350,44 @@ export default function RecordIdeaScreen() {
                                     <TouchableOpacity
                                         onPress={handleSendMessage}
                                         disabled={!inputText.trim()}
-                                        style={tw`w-9 h-9 rounded-full bg-white items-center justify-center ${!inputText.trim() ? 'opacity-50' : ''}`}
+                                        style={tw`w-10 h-10 rounded-full bg-white items-center justify-center ml-2 ${!inputText.trim() ? 'opacity-50' : ''}`}
                                     >
                                         <Send color="#000" size={18} />
                                     </TouchableOpacity>
                                 </View>
+                                
                                 <TouchableOpacity
+                                    onPress={handleSave}
                                     style={tw`w-14 h-14 rounded-full bg-accent-violet items-center justify-center shadow-lg shadow-accent-violet/30`}
                                 >
                                     <Save color="#fff" size={24} />
                                 </TouchableOpacity>
                             </View>
                         </BlurView>
+
+                        {/* Upload Modal */}
+                        <Modal visible={showUploadModal} transparent animationType="fade">
+                            <Pressable style={tw`flex-1 bg-black/50 justify-end`} onPress={() => setShowUploadModal(false)}>
+                                <View style={tw`bg-[#1c1c1e] p-6 rounded-t-[40px] border-t border-white/10`}>
+                                    <Text style={tw`text-white font-[InterTight-Bold] text-xl mb-6`}>Upload to chat</Text>
+                                    <TouchableOpacity onPress={() => handleFileUpload('photos')} style={tw`flex-row items-center py-4 border-b border-white/5`}>
+                                        <ImageIcon color="#fff" size={24} style={tw`mr-4`} />
+                                        <Text style={tw`text-white text-lg`}>Photos</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => handleFileUpload('camera')} style={tw`flex-row items-center py-4 border-b border-white/5`}>
+                                        <Camera color="#fff" size={24} style={tw`mr-4`} />
+                                        <Text style={tw`text-white text-lg`}>Camera</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => handleFileUpload('files')} style={tw`flex-row items-center py-4 border-b border-white/5`}>
+                                        <FileText color="#fff" size={24} style={tw`mr-4`} />
+                                        <Text style={tw`text-white text-lg`}>Files</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={() => setShowUploadModal(false)} style={tw`flex-row items-center py-4 mt-2 justify-center`}>
+                                        <Text style={tw`text-red-500 font-bold text-lg`}>Cancel</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </Pressable>
+                        </Modal>
                     </View>
                 )}
             </GlassBackground>

@@ -25,6 +25,9 @@ export default function SignInScreen() {
     const [displayName, setDisplayName] = useState('');
     const [userMetadata, setUserMetadata] = useState<any>(null);
 
+    const emailRef = useRef<TextInput>(null);
+    const passwordRef = useRef<TextInput>(null);
+
     // Animated modal values
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const cardTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -178,11 +181,14 @@ export default function SignInScreen() {
                                 textAlignVertical='center'
                                 autoCapitalize="none"
                                 keyboardType="email-address"
+                                ref={emailRef}
                                 value={email}
                                 onChangeText={(text) => {
                                     setEmail(text);
                                     if (emailError) setEmailError('');
                                 }}
+                                returnKeyType="next"
+                                onSubmitEditing={() => passwordRef.current?.focus()}
                             />
                         </View>
                     </View>
@@ -202,11 +208,14 @@ export default function SignInScreen() {
                                 placeholderTextColor="#666"
                                 textAlignVertical='center'
                                 secureTextEntry={!showPassword}
+                                ref={passwordRef}
                                 value={password}
                                 onChangeText={(text) => {
                                     setPassword(text);
                                     if (passwordError) setPasswordError('');
                                 }}
+                                returnKeyType="go"
+                                onSubmitEditing={handleLogin}
                             />
                             <TouchableOpacity
                                 onPress={() => setShowPassword(!showPassword)}

@@ -1,5 +1,5 @@
 import tw from '@/lib/tailwind';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Animated, Modal, Platform, PanResponder, Dimensions, Share, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Animated, Modal, Platform, PanResponder, Dimensions, Share, KeyboardAvoidingView, Alert, Pressable } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import {
@@ -28,8 +28,12 @@ import {
     Play,
     Pause,
     SkipBack,
-    SkipForward
+    SkipForward,
+    Camera,
+    Image as ImageIcon,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { PERSONAS, Persona, MOCK_INSIGHTS, MOCK_QUOTES, MOCK_TRANSCRIPTION } from '@/data/dahliaData';
@@ -58,6 +62,9 @@ export default function DahliaScreen() {
     const [showTextSettings, setShowTextSettings] = useState(false);
     const [transcriptionFont, setTranscriptionFont] = useState('InterTight');
     const [transcriptionFontSize, setTranscriptionFontSize] = useState(15);
+    const [inputText, setInputText] = useState('');
+    const [chatMessages, setChatMessages] = useState<any[]>(MOCK_TRANSCRIPTION);
+    const [showUploadModal, setShowUploadModal] = useState(false);
 
     // Advanced UI States
     const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
@@ -432,6 +439,31 @@ export default function DahliaScreen() {
         })
     ).current;
 
+    const handleSendMessage = () => {
+        if (!inputText.trim()) return;
+        const newUserMsg = { speaker: 'user', text: inputText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+        setChatMessages(prev => [...prev, newUserMsg]);
+        setInputText('');
+    };
+
+    const handleFileUpload = async (type: 'photos' | 'camera' | 'files') => {
+        setShowUploadModal(false);
+        try {
+            if (type === 'photos') {
+                const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+                if (!result.canceled) Alert.alert("Upload", "Image uploaded to chat.");
+            } else if (type === 'camera') {
+                const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+                if (!result.canceled) Alert.alert("Upload", "Photo uploaded to chat.");
+            } else if (type === 'files') {
+                const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+                if (!result.canceled) Alert.alert("Upload", "File uploaded to chat.");
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     const notesPanResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
@@ -669,7 +701,7 @@ export default function DahliaScreen() {
                                 contentContainerStyle={tw`pb-4`}
                                 onContentSizeChange={() => chatScrollViewRef.current?.scrollToEnd({ animated: true })}
                             >
-                                {MOCK_TRANSCRIPTION.map((msg, idx) => (
+                                {chatMessages.map((msg, idx) => (
                                     <View key={idx} style={tw`mb-6 ${msg.speaker === 'user' ? 'items-end' : 'items-start'}`}>
                                         <View style={tw`flex-row ${msg.speaker === 'user' ? 'flex-row-reverse' : ''}`}>
                                             {renderPersonaIcon(msg.speaker === 'user' ? { icon: 'male' } as any : selectedPersona, 36)}
@@ -679,7 +711,7 @@ export default function DahliaScreen() {
                                                         {msg.text}
                                                     </Text>
                                                 </View>
-                                                <Text style={tw`text-gray-500 text-[10px] mt-1 ${msg.speaker === 'user' ? 'mr-1' : 'ml-1'}`}>10:35 AM</Text>
+                                                <Text style={tw`text-gray-500 text-[10px] mt-1 ${msg.speaker === 'user' ? 'mr-1' : 'ml-1'}`}>{msg.time || '10:35 AM'}</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -688,18 +720,49 @@ export default function DahliaScreen() {
 
                             {/* Chat Input Inside Card */}
                             <View style={tw`flex-row items-center bg-white/5 rounded-full p-2 border border-white/10`}>
-                                <TouchableOpacity style={tw`p-2`}>
+                                <TouchableOpacity onPress={() => setShowUploadModal(true)} style={tw`p-2`}>
                                     <Paperclip color="#aaa" size={20} />
                                 </TouchableOpacity>
                                 <TextInput
                                     placeholder="Type a message..."
                                     placeholderTextColor="rgba(255,255,255,0.4)"
                                     style={tw`flex-1 text-white font-[InterTight] px-2 py-3`}
+                                    value={inputText}
+                                    onChangeText={setInputText}
+                                    onSubmitEditing={handleSendMessage}
                                 />
-                                <TouchableOpacity style={tw`bg-white w-10 h-10 rounded-full items-center justify-center ml-2`}>
+                                <TouchableOpacity 
+                                    onPress={handleSendMessage}
+                                    disabled={!inputText.trim()}
+                                    style={tw`bg-white w-10 h-10 rounded-full items-center justify-center ml-2 ${!inputText.trim() ? 'opacity-50' : ''}`}
+                                >
                                     <Send color="#000" size={18} />
                                 </TouchableOpacity>
                             </View>
+
+                            {/* Upload Modal */}
+                            <Modal visible={showUploadModal} transparent animationType="fade">
+                                <Pressable style={tw`flex-1 bg-black/50 justify-end`} onPress={() => setShowUploadModal(false)}>
+                                    <View style={tw`bg-[#1c1c1e] p-6 rounded-t-[40px] border-t border-white/10`}>
+                                        <Text style={tw`text-white font-[InterTight-Bold] text-xl mb-6`}>Upload to chat</Text>
+                                        <TouchableOpacity onPress={() => handleFileUpload('photos')} style={tw`flex-row items-center py-4 border-b border-white/5`}>
+                                            <ImageIcon color="#fff" size={24} style={tw`mr-4`} />
+                                            <Text style={tw`text-white text-lg`}>Photos</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => handleFileUpload('camera')} style={tw`flex-row items-center py-4 border-b border-white/5`}>
+                                            <Camera color="#fff" size={24} style={tw`mr-4`} />
+                                            <Text style={tw`text-white text-lg`}>Camera</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => handleFileUpload('files')} style={tw`flex-row items-center py-4 border-b border-white/5`}>
+                                            <FileText color="#fff" size={24} style={tw`mr-4`} />
+                                            <Text style={tw`text-white text-lg`}>Files</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => setShowUploadModal(false)} style={tw`flex-row items-center py-4 mt-2 justify-center`}>
+                                            <Text style={tw`text-red-500 font-bold text-lg`}>Cancel</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </Pressable>
+                            </Modal>
                         </GlassCard>
                     </View>
                 </KeyboardAvoidingView>

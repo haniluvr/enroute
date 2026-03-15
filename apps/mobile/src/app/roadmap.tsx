@@ -38,11 +38,11 @@ export default function RoadmapScreen() {
                 salary: '$80k - $120k',
                 demand: 'High',
                 steps: [
-                    { id: '1', title: 'Frontend Fundamentals', description: 'Master HTML, CSS, JavaScript basics and advanced concepts.' },
-                    { id: '2', title: 'React Framework', description: 'Build dynamic UIs with React, hooks, and state management.' },
-                    { id: '3', title: 'Backend APIs', description: 'Learn Node.js, Express, and RESTful API design.' },
-                    { id: '4', title: 'Database Construction', description: 'Understand SQL and NoSQL databases like PostgreSQL and MongoDB.' },
-                    { id: '1', title: 'Deployment & CI/CD', description: 'Get familiar with Git, Docker, and AWS deploying workflows.' }
+                    { id: '1', title: 'Frontend Fundamentals', description: 'Master HTML, CSS, JavaScript basics and advanced concepts.', completed: true },
+                    { id: '2', title: 'React Framework', description: 'Build dynamic UIs with React, hooks, and state management.', completed: false },
+                    { id: '3', title: 'Backend APIs', description: 'Learn Node.js, Express, and RESTful API design.', completed: false },
+                    { id: '4', title: 'Database Construction', description: 'Understand SQL and NoSQL databases like PostgreSQL and MongoDB.', completed: false },
+                    { id: '1', title: 'Deployment & CI/CD', description: 'Get familiar with Git, Docker, and AWS deploying workflows.', completed: false }
                 ]
             });
         }, 2000);
@@ -62,6 +62,17 @@ export default function RoadmapScreen() {
             });
         } catch (error) {
             console.error(error);
+        }
+    };
+
+    const handleStartLearning = () => {
+        if (!roadmapData || !roadmapData.steps) return;
+        
+        // Find the first step that is not completed. If all are completed, fallback to the last step.
+        const nextStep = roadmapData.steps.find((step: any) => !step.completed) || roadmapData.steps[roadmapData.steps.length - 1];
+        
+        if (nextStep) {
+            router.push(`/roadmap-details/${nextStep.id}`);
         }
     };
 
@@ -157,10 +168,10 @@ export default function RoadmapScreen() {
                                     <View style={tw`mb-4`}>
                                         <View style={tw`flex-row justify-between mb-1.5`}>
                                             <Text style={tw`text-gray-400 font-[InterTight] text-xs`}>Progress</Text>
-                                            <Text style={tw`text-gray-400 font-[InterTight] text-xs`}>0%</Text>
+                                            <Text style={tw`text-gray-400 font-[InterTight] text-xs`}>{step.completed ? '100%' : '0%'}</Text>
                                         </View>
                                         <View style={tw`w-full h-1.5 bg-white/10 rounded-full overflow-hidden`}>
-                                            <View style={tw`w-[0%] h-full bg-[#10b981] rounded-full`} />
+                                            <View style={tw`h-full bg-[#10b981] rounded-full ${step.completed ? 'w-full' : 'w-[0%]'}`} />
                                         </View>
                                     </View>
 
@@ -217,7 +228,7 @@ export default function RoadmapScreen() {
                             </BlurView>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => {}}
+                            onPress={handleStartLearning}
                             style={tw`flex-1 h-14 bg-white rounded-full items-center justify-center shadow-lg`}
                         >
                             <Text style={tw`text-black text-[17px] font-[InterTight] font-semibold`}>Start learning</Text>

@@ -45,6 +45,15 @@ export default function HomeScreen() {
                                     });
                                 }
                             }}
+                            returnKeyType="search"
+                            onSubmitEditing={(e) => {
+                                if (e.nativeEvent.text.length > 0) {
+                                    router.push({
+                                        pathname: '/(tabs)/dahlia',
+                                        params: { q: e.nativeEvent.text }
+                                    });
+                                }
+                            }}
                         />
                     </View>
                 </View>
@@ -116,32 +125,45 @@ export default function HomeScreen() {
                 <View style={tw`px-6`}>
                     <Text style={tw`text-gray-300 font-[InterTight-Medium] text-[17px] mb-5`}>History</Text>
 
-                    {/* Placeholder History Card */}
-                    <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10 mb-4`} noPadding>
-                        <View style={tw`flex-row justify-between items-center mb-4`}>
-                            <View style={tw`bg-[#3D3A2C] px-3 py-1.5 rounded-full flex-row items-center border border-[#6B6330]`}>
-                                <GraduationCap color="#EEDF7A" size={14} style={tw`mr-1.5`} />
-                                <Text style={tw`text-[#EEDF7A] font-[InterTight-Medium] text-sm`}>Course</Text>
-                            </View>
-                            <View style={tw`bg-white/10 w-8 h-8 rounded-full items-center justify-center`}>
-                                <ChevronRight color="#888" size={18} />
-                            </View>
-                        </View>
+                    {[
+                        { id: 1, type: 'Roadmap', title: 'UI/UX Engineering Path', detail: '80% Complete', status: 'In Progress', progress: 0.8 },
+                        { id: 2, type: 'Interview', title: 'Prep with Dahlia', detail: 'Mock Interview: Senior Designer', status: 'Completed', progress: 1.0 },
+                        { id: 3, type: 'Scan', title: 'Resume Analysis', detail: '4 skills detected', status: 'Completed', progress: 1.0 }
+                    ].map((activity) => (
+                        <TouchableOpacity 
+                            key={activity.id}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                if (activity.type === 'Roadmap') router.push('/library/roadmaps');
+                                else if (activity.type === 'Interview') router.push('/library/conversations');
+                                else if (activity.type === 'Scan') router.push('/library/resources');
+                                else router.push('/library');
+                            }}
+                        >
+                            <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10 mb-4`} noPadding>
+                                <View style={tw`flex-row justify-between items-center mb-4`}>
+                                    <View style={tw`bg-[#2b4e50] px-3 py-1.5 rounded-full flex-row items-center border border-white/10`}>
+                                        <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>{activity.type}</Text>
+                                    </View>
+                                    <View style={tw`bg-white/10 w-8 h-8 rounded-full items-center justify-center`}>
+                                        <ChevronRight color="#888" size={18} />
+                                    </View>
+                                </View>
 
-                        <Text style={tw`text-gray-300 font-[InterTight] text-[15px] mb-2`} numberOfLines={1}>
-                            <Text style={tw`text-white font-[InterTight-Medium]`}>Request:</Text> How get started with UI/UX
-                        </Text>
-                        <Text style={tw`text-gray-300 font-[InterTight] text-[15px] mb-4`} numberOfLines={1}>
-                            <Text style={tw`text-white font-[InterTight-Medium]`}>Ai recap:</Text> Start with wireframes, UI
-                        </Text>
+                                <Text style={tw`text-white font-[InterTight-Medium] text-[16px] mb-1`}>
+                                    {activity.title}
+                                </Text>
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm mb-4`}>
+                                    {activity.detail}
+                                </Text>
 
-                        {/* Progress Bar Placeholder */}
-                        <View style={tw`w-full h-1 bg-white/10 rounded-full mt-2`}>
-                            <View style={tw`w-1/4 h-1 bg-white rounded-full`} />
-                            {/* Thumb */}
-                            <View style={tw`w-3 h-3 bg-white rounded-full absolute -top-1 left-1/4 shadow`} />
-                        </View>
-                    </GlassCard>
+                                {/* Progress Bar */}
+                                <View style={tw`w-full h-1 bg-white/10 rounded-full overflow-hidden`}>
+                                    <View style={[tw`h-full bg-white rounded-full`, { width: `${activity.progress * 100}%` }]} />
+                                </View>
+                            </GlassCard>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
             </ScrollView>

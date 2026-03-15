@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Keyboard } from 'react-native';
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
@@ -12,6 +12,7 @@ import {
     Download,
     MessageSquare,
     ChevronRight,
+    Trash2
 } from 'lucide-react-native';
 
 const CATEGORIES = [
@@ -23,8 +24,45 @@ const CATEGORIES = [
 
 export default function LibraryScreen() {
     const router = useRouter();
+    const [recentItems, setRecentItems] = React.useState([
+        { id: 1, title: "UI/UX Design Roadmap", subtitle: "Updated 2 days ago", type: "roadmap" },
+        { id: 2, title: "Voice Idea: App Concept", subtitle: "Recorded yesterday", type: "idea" },
+        { id: 3, title: "Dahlia Conversation", subtitle: "Career advice session", type: "conversation" },
+        { id: 4, title: "Product Management 101", subtitle: "Downloaded Resource", type: "resource" },
+    ]);
 
-    const renderItem = (title: string, subtitle: string, type: string) => (
+    const handleDelete = (id: number) => {
+        Alert.alert(
+            "Delete Item",
+            "Are you sure you want to remove this item from your library?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Delete", 
+                    onPress: () => setRecentItems(prev => prev.filter(item => item.id !== id)),
+                    style: "destructive" 
+                }
+            ]
+        );
+    };
+
+    const handleClearAll = () => {
+        if (recentItems.length === 0) return;
+        Alert.alert(
+            "Clear Library",
+            "Are you sure you want to clear all recent activity?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Clear All", 
+                    onPress: () => setRecentItems([]),
+                    style: "destructive" 
+                }
+            ]
+        );
+    };
+
+    const renderItem = (id: number, title: string, subtitle: string, type: string) => (
         <TouchableOpacity activeOpacity={0.7} style={tw`mb-4`}>
             <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10`} noPadding>
                 <View style={tw`flex-row justify-between items-center`}>
@@ -32,9 +70,17 @@ export default function LibraryScreen() {
                         <Text style={tw`text-white font-[InterTight-Medium] text-[15px] mb-1`}>{title}</Text>
                         <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>{subtitle}</Text>
                     </View>
-                    <TouchableOpacity style={tw`bg-white/10 w-8 h-8 rounded-full items-center justify-center`}>
-                        <ChevronRight color="#888" size={18} />
-                    </TouchableOpacity>
+                    <View style={tw`flex-row items-center gap-2`}>
+                        <TouchableOpacity 
+                            onPress={() => handleDelete(id)}
+                            style={tw`bg-red-500/10 w-8 h-8 rounded-full items-center justify-center border border-red-500/20`}
+                        >
+                            <Trash2 color="#df4444" size={16} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={tw`bg-white/10 w-8 h-8 rounded-full items-center justify-center`}>
+                            <ChevronRight color="#888" size={18} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </GlassCard>
         </TouchableOpacity>
@@ -65,6 +111,8 @@ export default function LibraryScreen() {
                             placeholder="Search library..."
                             placeholderTextColor="rgba(255, 255, 255, 0.5)"
                             textAlignVertical="center"
+                            returnKeyType="search"
+                            onSubmitEditing={() => Keyboard.dismiss()}
                         />
                     </View>
                 </View>
@@ -77,6 +125,7 @@ export default function LibraryScreen() {
                                 key={cat.id}
                                 style={tw`w-[48%]`}
                                 activeOpacity={0.8}
+                                onPress={() => router.push(`/library/${cat.id}`)}
                             >
                                 <GlassCard style={tw`h-[140px] p-5 justify-between bg-white/10 shadow-xl border-t border-white/20`} noPadding>
                                     <View style={tw`bg-[#fcfcfc]/20 w-11 h-11 rounded-2xl items-center justify-center`}>
@@ -93,6 +142,7 @@ export default function LibraryScreen() {
                                 key={cat.id}
                                 style={tw`w-[48%]`}
                                 activeOpacity={0.8}
+                                onPress={() => router.push(`/library/${cat.id}`)}
                             >
                                 <GlassCard style={tw`h-[140px] p-5 justify-between bg-white/10 shadow-xl border-t border-white/20`} noPadding>
                                     <View style={tw`bg-[#fcfcfc]/20 w-11 h-11 rounded-2xl items-center justify-center`}>
@@ -109,15 +159,18 @@ export default function LibraryScreen() {
                 <View style={tw`px-6`}>
                     <View style={tw`flex-row justify-between items-center mb-5`}>
                         <Text style={tw`text-gray-300 font-[InterTight-Medium] text-[17px]`}>Recent Activity</Text>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={handleClearAll}>
                             <Text style={tw`text-white/40 font-[InterTight] text-sm`}>Clear all</Text>
                         </TouchableOpacity>
                     </View>
 
-                    {renderItem("UI/UX Design Roadmap", "Updated 2 days ago", "roadmap")}
-                    {renderItem("Voice Idea: App Concept", "Recorded yesterday", "idea")}
-                    {renderItem("Dahlia Conversation", "Career advice session", "conversation")}
-                    {renderItem("Product Management 101", "Downloaded Resource", "resource")}
+                    {recentItems.length === 0 ? (
+                        <View style={tw`py-10 items-center`}>
+                            <Text style={tw`text-gray-500 font-[InterTight]`}>No recent activity</Text>
+                        </View>
+                    ) : (
+                        recentItems.map(item => renderItem(item.id, item.title, item.subtitle, item.type))
+                    )}
                 </View>
             </ScrollView>
         </GlassBackground>

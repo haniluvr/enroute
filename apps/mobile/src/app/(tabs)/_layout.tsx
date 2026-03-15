@@ -29,7 +29,7 @@ export default function TabLayout() {
 
                     <NativeTabs.Trigger name="explore">
                         <Label>Explore</Label>
-                        <Icon sf="safari.fill" />
+                        <Icon sf="safari" />
                     </NativeTabs.Trigger>
 
                     <NativeTabs.Trigger name="profile">
