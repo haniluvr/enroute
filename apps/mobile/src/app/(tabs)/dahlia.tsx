@@ -35,18 +35,21 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { PERSONAS, Persona, MOCK_INSIGHTS, MOCK_QUOTES, MOCK_TRANSCRIPTION } from '@/data/dahliaData';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 type ViewState = 'selection' | 'active_call' | 'summary';
 type CallMode = 'voice' | 'text';
 
 export default function DahliaScreen() {
-    const { q } = useLocalSearchParams<{ q: string }>();
+    const { user } = useAuth();
+    const { q, id: existingConvId } = useLocalSearchParams<{ q: string, id: string }>();
     const router = useRouter();
     const navigation = useNavigation();
     const [viewState, setViewState] = useState<ViewState>('selection');
@@ -63,7 +66,9 @@ export default function DahliaScreen() {
     const [transcriptionFont, setTranscriptionFont] = useState('InterTight');
     const [transcriptionFontSize, setTranscriptionFontSize] = useState(15);
     const [inputText, setInputText] = useState('');
-    const [chatMessages, setChatMessages] = useState<any[]>(MOCK_TRANSCRIPTION);
+    const [chatMessages, setChatMessages] = useState<any[]>([]);
+    const [conversationId, setConversationId] = useState<string | null>(existingConvId || null);
+    const [isLoading, setIsLoading] = useState(false);
     const [showUploadModal, setShowUploadModal] = useState(false);
 
     // Advanced UI States
@@ -439,28 +444,178 @@ export default function DahliaScreen() {
         })
     ).current;
 
-    const handleSendMessage = () => {
-        if (!inputText.trim()) return;
-        const newUserMsg = { speaker: 'user', text: inputText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-        setChatMessages(prev => [...prev, newUserMsg]);
+    const startConversation = async (persona: Persona) => {
+        if (!user || user.id === 'pending' || conversationId) return;
+        try {
+            const { data, error } = await supabase
+                .from('conversations')
+                .insert({
+                    user_id: user.id,
+                    persona_name: persona.name,
+                    persona_type: persona.type,
+                    status: 'active',
+                })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            setConversationId(data.id);
+            return data.id;
+        } catch (err) {
+            console.error('Start Conversation Error:', err);
+        }
+    };
+
+    const fetchMessages = useCallback(async (convId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('conversation_messages')
+                .select('*')
+                .eq('conversation_id', convId)
+                .order('created_at', { ascending: true });
+            
+            if (error) throw error;
+            setChatMessages(data || []);
+        } catch (err) {
+            console.error('Fetch Messages Error:', err);
+        }
+    }, []);
+
+    const fetchNotes = useCallback(async (convId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('conversation_notes')
+                .select('*')
+                .eq('conversation_id', convId)
+                .order('created_at', { ascending: true });
+            
+            if (error) throw error;
+            setNotes(data || []);
+        } catch (err) {
+            console.error('Fetch Notes Error:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (existingConvId) {
+            setViewState('active_call');
+            fetchMessages(existingConvId);
+            fetchNotes(existingConvId);
+        }
+    }, [existingConvId, fetchMessages, fetchNotes]);
+
+    const handleSendMessage = async () => {
+        if (!inputText.trim() || !user || user.id === 'pending') return;
+        
+        let currentConvId = conversationId;
+        if (!currentConvId) {
+            currentConvId = await startConversation(selectedPersona);
+        }
+
+        if (!currentConvId) return;
+
+        const text = inputText;
         setInputText('');
+
+        const newUserMsg = { 
+            conversation_id: currentConvId,
+            speaker: 'user' as const, 
+            message_text: text,
+            created_at: new Date().toISOString()
+        };
+
+        setChatMessages(prev => [...prev, newUserMsg]);
+
+        try {
+            const { error } = await supabase.from('conversation_messages').insert(newUserMsg);
+            if (error) throw error;
+
+            // Simulate AI response
+            setTimeout(async () => {
+                const aiResponse = {
+                    conversation_id: currentConvId,
+                    speaker: 'ai' as const,
+                    message_text: `I understand you're interested in ${text}. Let's explore that further.`,
+                    created_at: new Date().toISOString()
+                };
+                setChatMessages(prev => [...prev, aiResponse]);
+                await supabase.from('conversation_messages').insert(aiResponse);
+            }, 1000);
+
+        } catch (err) {
+            console.error('Save Message Error:', err);
+        }
+    };
+
+    const uploadToSupabase = async (uri: string, name: string, type: string) => {
+        if (!user || user.id === 'pending' || !conversationId) return;
+        try {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            const filePath = `${user.id}/${conversationId}/${Date.now()}_${name}`;
+
+            const { data, error } = await supabase.storage
+                .from('chat_attachments')
+                .upload(filePath, blob, {
+                    contentType: type
+                });
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('chat_attachments')
+                .getPublicUrl(filePath);
+
+            return publicUrl;
+        } catch (error) {
+            console.error('Upload Error:', error);
+            return null;
+        }
     };
 
     const handleFileUpload = async (type: 'photos' | 'camera' | 'files') => {
         setShowUploadModal(false);
+        if (!conversationId) {
+            const newId = await startConversation(selectedPersona);
+            if (!newId) return;
+        }
+
         try {
+            let result: any;
             if (type === 'photos') {
-                const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
-                if (!result.canceled) Alert.alert("Upload", "Image uploaded to chat.");
+                result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
             } else if (type === 'camera') {
-                const result = await ImagePicker.launchCameraAsync({ quality: 1 });
-                if (!result.canceled) Alert.alert("Upload", "Photo uploaded to chat.");
+                result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
             } else if (type === 'files') {
-                const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
-                if (!result.canceled) Alert.alert("Upload", "File uploaded to chat.");
+                result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+            }
+
+            if (result && !result.canceled) {
+                const asset = result.assets ? result.assets[0] : result;
+                const fileUri = asset.uri;
+                const fileName = asset.name || `file_${Date.now()}`;
+                const fileType = asset.mimeType || 'application/octet-stream';
+
+                setIsLoading(true);
+                const publicUrl = await uploadToSupabase(fileUri, fileName, fileType);
+                setIsLoading(false);
+
+                if (publicUrl) {
+                    const fileMsg = {
+                        conversation_id: conversationId,
+                        speaker: 'user' as const,
+                        message_text: `[File: ${fileName}]`,
+                        attachment_url: publicUrl,
+                        attachment_type: type,
+                        created_at: new Date().toISOString()
+                    };
+                    setChatMessages(prev => [...prev, fileMsg]);
+                    await supabase.from('conversation_messages').insert(fileMsg);
+                }
             }
         } catch (error) {
             console.error(error);
+            setIsLoading(false);
         }
     };
 
@@ -554,8 +709,9 @@ export default function DahliaScreen() {
 
             <View style={tw`px-6 mb-20`}>
                 <TouchableOpacity
-                    onPress={() => {
+                    onPress={async () => {
                         setCallDuration(0);
+                        await startConversation(selectedPersona);
                         setViewState('active_call');
                     }}
                     style={tw`bg-white rounded-full py-4 items-center justify-center shadow-lg w-full`}
@@ -708,10 +864,10 @@ export default function DahliaScreen() {
                                             <View style={tw`ml-3 mr-3 flex-1 ${msg.speaker === 'user' ? 'items-end' : 'items-start'}`}>
                                                 <View style={tw`rounded-2xl p-4 self-start max-w-[90%] border border-white/5 ${msg.speaker === 'user' ? 'bg-[#2b4e50]' : 'bg-white/5'}`}>
                                                     <Text style={tw`text-white font-[InterTight] leading-5`}>
-                                                        {msg.text}
+                                                        {msg.message_text}
                                                     </Text>
                                                 </View>
-                                                <Text style={tw`text-gray-500 text-[10px] mt-1 ${msg.speaker === 'user' ? 'mr-1' : 'ml-1'}`}>{msg.time || '10:35 AM'}</Text>
+                                                <Text style={tw`text-gray-500 text-[10px] mt-1 ${msg.speaker === 'user' ? 'mr-1' : 'ml-1'}`}>{msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -907,8 +1063,19 @@ export default function DahliaScreen() {
                                 </View>
 
                                 <TouchableOpacity
-                                    onPress={() => {
+                                    onPress={async () => {
                                         setIsTimerRunning(false);
+                                        if (conversationId) {
+                                            await supabase.from('conversations').update({ 
+                                                status: 'completed',
+                                                metadata: {
+                                                    duration: callDuration,
+                                                    insights: MOCK_INSIGHTS,
+                                                    quotes: MOCK_QUOTES,
+                                                    summary: `Coaching session with ${selectedPersona.name}`
+                                                }
+                                            }).eq('id', conversationId);
+                                        }
                                         setShowSaveModal(false);
                                         setViewState('summary');
                                     }}
@@ -1053,14 +1220,24 @@ export default function DahliaScreen() {
                                             style={tw`bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white font-[InterTight]`}
                                             value={noteInput}
                                             onChangeText={setNoteInput}
-                                            onSubmitEditing={() => {
-                                                if (noteInput.trim()) {
-                                                    setNotes([...notes, {
-                                                        id: Date.now(),
+                                            onSubmitEditing={async () => {
+                                                if (noteInput.trim() && user && conversationId) {
+                                                    const newNote = {
+                                                        conversation_id: conversationId,
                                                         title: 'New Note',
                                                         content: noteInput,
-                                                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                    }]);
+                                                        created_at: new Date().toISOString()
+                                                    };
+                                                    
+                                                    const { data, error } = await supabase
+                                                        .from('conversation_notes')
+                                                        .insert(newNote)
+                                                        .select()
+                                                        .single();
+
+                                                    if (!error && data) {
+                                                        setNotes([...notes, data]);
+                                                    }
                                                     setNoteInput('');
                                                 }
                                             }}

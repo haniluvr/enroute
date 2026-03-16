@@ -1,65 +1,110 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { CareerCard, CareerCardData } from '@/components/explore/CareerCard';
 import { SwipeableCard } from '@/components/explore/SwipeableCard';
-import { X, Heart, Search } from 'lucide-react-native';
+import { X, Heart, Search, Loader } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const MOCK_JOBS: CareerCardData[] = [
-    {
-        id: '1',
-        company: 'Figma',
-        location: 'San Francisco, CA',
-        role: 'Senior UX Designer',
-        description: 'Shape the future of collaborative design tools. Lead end-to-end product experiences for millions of designers...',
-        matchPercentage: 94,
-        skills: ['Figma', 'Prototyping', 'User Research', 'Design Systems'],
-        salary: '$140k – $180k / yr',
-        color: '#a78bfa'
-    },
-    {
-        id: '2',
-        company: 'Vercel',
-        location: 'Remote',
-        role: 'Frontend Engineer',
-        description: 'Join the team building the frontend cloud. Experience with React, Next.js, and performance optimization is key.',
-        matchPercentage: 88,
-        skills: ['React', 'Next.js', 'TypeScript', 'Tailwind CSS'],
-        salary: '$130k – $170k / yr',
-        color: '#ffffff'
-    },
-    {
-        id: '3',
-        company: 'Airbnb',
-        location: 'San Francisco, CA',
-        role: 'Product Designer',
-        description: 'Design world-class travel experiences. We value craft, simplicity, and a deep understanding of user needs.',
-        matchPercentage: 91,
-        skills: ['Visual Design', 'Interaction Design', 'Storytelling'],
-        salary: '$150k – $200k / yr',
-        color: '#ff5a5f'
-    }
-];
-
 export default function ExploreScreen() {
+    const { user } = useAuth();
     const router = useRouter();
-    const [jobs, setJobs] = useState<CareerCardData[]>(MOCK_JOBS);
-    const [hasTakenTest, setHasTakenTest] = useState(false); // Set to false to show the card
-    const bypassTest = true; // Bypassing for testing as requested
+    const [jobs, setJobs] = useState<CareerCardData[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasTakenTest, setHasTakenTest] = useState(false);
+    const bypassTest = true;
+
+    const fetchJobs = useCallback(async () => {
+        if (!user || user.id === 'pending') return;
+        setIsLoading(true);
+        try {
+            // 1. Check if user has taken the test
+            const { data: assessments } = await supabase
+                .from('career_assessments')
+                .select('id')
+                .eq('user_id', user.id)
+                .limit(1);
+            
+            setHasTakenTest((assessments?.length || 0) > 0);
+
+            // 2. Get swiped job IDs
+            const { data: swipes } = await supabase
+                .from('job_swipes')
+                .select('job_id')
+                .eq('user_id', user.id);
+            
+            const swipedIds = swipes?.map(s => s.job_id) || [];
+
+            // 3. Fetch jobs
+            let query = supabase
+                .from('jobs')
+                .select('*')
+                .eq('is_active', true);
+            
+            if (swipedIds.length > 0) {
+                query = query.not('id', 'in', `(${swipedIds.join(',')})`);
+            }
+
+            const { data: jobsData, error } = await query.limit(10);
+
+            if (error) throw error;
+
+            const formattedJobs: CareerCardData[] = (jobsData || []).map(j => ({
+                id: j.id,
+                company: j.company_name,
+                location: j.location,
+                role: j.role_title,
+                description: j.description || '',
+                matchPercentage: 0, 
+                skills: j.required_skills || [],
+                salary: j.salary_range || 'Competitive',
+                color: '#a78bfa'
+            }));
+
+            setJobs(formattedJobs);
+        } catch (err) {
+            console.error('Fetch Jobs Error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        fetchJobs();
+    }, [fetchJobs]);
+
+    const handleSwipe = async (isInterested: boolean) => {
+        const swipedJob = jobs[0];
+        if (!swipedJob || !user) return;
+
+        try {
+            const { error } = await supabase.from('job_swipes').insert({
+                user_id: user.id,
+                job_id: swipedJob.id,
+                is_interested: isInterested,
+                ai_match_percentage: swipedJob.matchPercentage
+            });
+
+            if (error) throw error;
+
+            setJobs((prev) => prev.slice(1));
+        } catch (err) {
+            console.error('Swipe Error:', err);
+        }
+    };
 
     const handleSwipeLeft = useCallback(() => {
-        console.log('Skipped:', jobs[0]?.role);
-        setJobs((prev) => prev.slice(1));
-    }, [jobs]);
+        handleSwipe(false);
+    }, [jobs, user]);
 
     const handleSwipeRight = useCallback(() => {
-        console.log('Interested in:', jobs[0]?.role);
-        setJobs((prev) => prev.slice(1));
-    }, [jobs]);
+        handleSwipe(true);
+    }, [jobs, user]);
 
     const renderEmptyState = () => (
         <View style={tw`flex-1 items-center justify-center p-8`}>
@@ -72,7 +117,7 @@ export default function ExploreScreen() {
             </Text>
             <TouchableOpacity
                 style={tw`bg-white/10 px-8 py-3 rounded-full border border-white/10`}
-                onPress={() => setJobs(MOCK_JOBS)}
+                onPress={fetchJobs}
             >
                 <Text style={tw`text-white font-[InterTight] font-semibold`}>Refresh Matches</Text>
             </TouchableOpacity>
@@ -111,6 +156,11 @@ export default function ExploreScreen() {
                 <View style={tw`flex-1 mb-10 relative`}>
                     {!bypassTest && !hasTakenTest ? (
                         renderTestPrompt()
+                    ) : isLoading ? (
+                        <View style={tw`flex-1 items-center justify-center`}>
+                            <Loader color="#fff" size={32} style={tw`mb-4`} />
+                            <Text style={tw`text-gray-400 font-[InterTight]`}>Finding matches for you...</Text>
+                        </View>
                     ) : jobs.length > 0 ? (
                         <View style={tw`flex-1`}>
                             {jobs.slice(0, 3).reverse().map((job, index, array) => {

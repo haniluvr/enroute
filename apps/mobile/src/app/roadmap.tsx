@@ -2,21 +2,25 @@ import tw from '@/lib/tailwind';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert, Share } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Check, Download, BookmarkPlus, Clock, DollarSign, TrendingUp, ChevronRight, Bookmark, Share2, Calendar, Loader } from 'lucide-react-native';
-import { useState } from 'react';
+import { ChevronLeft, Check, Download, BookmarkPlus, Clock, DollarSign, TrendingUp, ChevronRight, Bookmark, Share2, Calendar, Loader, Award, ExternalLink } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
 import { BlurView } from 'expo-blur';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 const COMMON_SKILLS = [
     'JavaScript', 'Python', 'React', 'Node.js', 'SQL', 'Git', 'AWS', 'Docker', 'UI/UX Design', 'Agile', 'Figma', 'TypeScript'
 ];
 
 export default function RoadmapScreen() {
+    const { user } = useAuth();
     const router = useRouter();
     const [goal, setGoal] = useState('');
     const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [roadmapData, setRoadmapData] = useState<any>(null);
     const [isSaved, setIsSaved] = useState(false);
+    const [roadmapId, setRoadmapId] = useState<string | null>(null);
 
     const toggleSkill = (skill: string) => {
         setSelectedSkills(prev =>
@@ -24,35 +28,142 @@ export default function RoadmapScreen() {
         );
     };
 
-    const handleGenerate = () => {
-        if (!goal.trim()) {
+    const handleGenerate = async () => {
+        if (!goal.trim() || !user || user.id === 'pending') {
             Alert.alert("Goal required", "Please tell us what you want to learn.");
             return;
         }
         setIsGenerating(true);
-        // Mock generation
-        setTimeout(() => {
-            setIsGenerating(false);
+        
+        try {
+            // 1. Mock AI generation (Delay)
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            let mockData: any;
+            
+            const lowerGoal = goal.toLowerCase();
+            if (lowerGoal.includes('data') || lowerGoal.includes('python') || lowerGoal.includes('analysis')) {
+                mockData = {
+                    time: '8 Months',
+                    salary: '$90k - $140k',
+                    demand: 'Critical',
+                    steps: [
+                        { title: 'Google Data Analytics Professional Certificate', description: 'Master data cleaning, analysis, and visualization with SQL, R, and Tableau.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
+                        { title: 'IBM Data Science Professional Certificate', description: 'Learn Python, SQL, and Machine Learning. Build data-driven models.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
+                        { title: 'Applied Data Science with Python Specialization', description: 'Deep dive into data visualization, text mining, and social network analysis.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
+                        { title: 'Capstone: Real-world Business Analysis', description: 'Apply analytics to solve a real business problem and present your findings.', platform: 'Enroute AI', hasCertificate: false, isCertification: false, completed: false }
+                    ]
+                };
+            } else if (lowerGoal.includes('web') || lowerGoal.includes('developer') || lowerGoal.includes('full stack')) {
+                mockData = {
+                    time: '9 Months',
+                    salary: '$85k - $130k',
+                    demand: 'Very High',
+                    steps: [
+                        { title: 'Meta Front-End Developer Professional Certificate', description: 'Master HTML, CSS, JavaScript, and React to build responsive web apps.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
+                        { title: 'Meta Back-End Developer Professional Certificate', description: 'Learn Python, Django, and database management for scalable back-ends.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
+                        { title: 'Full Stack Web Development (HKUST)', description: 'Implement complex server-side logic and integrate with front-end frameworks.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
+                        { title: 'Deployment & System Architecture', description: 'Deploy your applications using AWS/GCP and learn CI/CD best practices.', platform: 'Enroute AI', hasCertificate: false, isCertification: false, completed: false }
+                    ]
+                };
+            } else {
+                // Default UI/UX or general creative path
+                mockData = {
+                    time: '6 Months',
+                    salary: '$80k - $120k',
+                    demand: 'High',
+                    steps: [
+                        { title: 'Google UX Design Professional Certificate', description: 'Foundations of User Experience (UX) Design, wireframing, and user research.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
+                        { title: 'UI/UX Design Specialization (CalArts)', description: 'Visual elements, strategy, and design fundamentals. Learn visual hierarchies.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
+                        { title: 'Interaction Design Specialization', description: 'Deep dive into user research techniques, storyboarding, and rapid prototyping.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
+                        { title: 'Portfolio Development & Practice', description: 'Apply your skills to real-world projects and build a professional design portfolio.', platform: 'Enroute AI', hasCertificate: false, isCertification: false, completed: false }
+                    ]
+                };
+            }
+
+            // 2. Save Roadmap to Supabase
+            const { data: roadmap, error: roadmapError } = await supabase
+                .from('roadmaps')
+                .insert({
+                    user_id: user.id,
+                    goal: goal,
+                    estimated_duration: mockData.time,
+                    salary_range: mockData.salary,
+                    demand_level: mockData.demand,
+                    current_skills: selectedSkills
+                })
+                .select()
+                .single();
+
+            if (roadmapError) throw roadmapError;
+
+            // 3. Save Steps
+            const stepsToInsert = mockData.steps.map((step: any, index: number) => ({
+                roadmap_id: roadmap.id,
+                title: step.title,
+                description: step.description,
+                is_completed: step.completed,
+                educational_platform: step.platform,
+                has_certification: step.hasCertificate,
+                is_professional_cert: step.isCertification,
+                order: index
+            }));
+
+            const { data: savedSteps, error: stepsError } = await supabase
+                .from('roadmap_steps')
+                .insert(stepsToInsert)
+                .select();
+
+            if (stepsError) throw stepsError;
+
+            setRoadmapId(roadmap.id);
             setRoadmapData({
-                time: '6 Months',
-                salary: '$80k - $120k',
-                demand: 'High',
-                steps: [
-                    { id: '1', title: 'Frontend Fundamentals', description: 'Master HTML, CSS, JavaScript basics and advanced concepts.', completed: true },
-                    { id: '2', title: 'React Framework', description: 'Build dynamic UIs with React, hooks, and state management.', completed: false },
-                    { id: '3', title: 'Backend APIs', description: 'Learn Node.js, Express, and RESTful API design.', completed: false },
-                    { id: '4', title: 'Database Construction', description: 'Understand SQL and NoSQL databases like PostgreSQL and MongoDB.', completed: false },
-                    { id: '1', title: 'Deployment & CI/CD', description: 'Get familiar with Git, Docker, and AWS deploying workflows.', completed: false }
-                ]
+                ...mockData,
+                id: roadmap.id,
+                steps: savedSteps
             });
-        }, 2000);
+
+        } catch (err) {
+            console.error('Generate Roadmap Error:', err);
+            Alert.alert("Error", "Failed to generate roadmap. Please try again.");
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
-    const handleSave = () => {
-        if (!isSaved) {
-            Alert.alert("Success", "Roadmap saved to library!");
+    const handleSave = async () => {
+        if (!user || !roadmapId || !roadmapData) return;
+
+        try {
+            if (!isSaved) {
+                const { error } = await supabase.from('library_saves').insert({
+                    user_id: user.id,
+                    item_type: 'roadmap',
+                    item_id: roadmapId,
+                    title: goal,
+                    metadata: {
+                        duration: roadmapData.time,
+                        steps_count: roadmapData.steps.length
+                    }
+                });
+                if (error) throw error;
+                Alert.alert("Success", "Roadmap saved to library!");
+                setIsSaved(true);
+            } else {
+                // Optionally handle unsave
+                const { error } = await supabase
+                    .from('library_saves')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('item_id', roadmapId);
+                
+                if (error) throw error;
+                setIsSaved(false);
+            }
+        } catch (err) {
+            console.error('Save Roadmap Error:', err);
+            Alert.alert("Error", "Failed to save roadmap.");
         }
-        setIsSaved(!isSaved);
     };
 
     const handleShare = async () => {
@@ -175,13 +286,31 @@ export default function RoadmapScreen() {
                                         </View>
                                     </View>
 
-                                    <View style={tw`bg-white/5 rounded-xl px-4 py-2.5 mt-1 self-start`}>
-                                        <View style={tw`flex-row items-center`}>
-                                            <Calendar color="#888" size={14} style={tw`mr-1.5`} />
-                                            <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>
+                                    <View style={tw`flex-row flex-wrap gap-2 mt-1`}>
+                                        <View style={tw`bg-white/5 rounded-xl px-3 py-1.5 flex-row items-center border border-white/5`}>
+                                            <Calendar color="#888" size={12} style={tw`mr-1.5`} />
+                                            <Text style={tw`text-gray-400 font-[InterTight] text-[13px]`}>
                                                 Est. {roadmapData.time}
                                             </Text>
                                         </View>
+                                        
+                                        {step.platform && (
+                                            <View style={tw`bg-cyan-500/10 rounded-xl px-3 py-1.5 flex-row items-center border border-cyan-500/20`}>
+                                                <ExternalLink color="#22d3ee" size={12} style={tw`mr-1.5`} />
+                                                <Text style={tw`text-cyan-400 font-[InterTight-Medium] text-[13px]`}>
+                                                    {step.platform}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {step.hasCertificate && (
+                                            <View style={tw`bg-amber-500/10 rounded-xl px-3 py-1.5 flex-row items-center border border-amber-500/20`}>
+                                                <Award color="#f59e0b" size={12} style={tw`mr-1.5`} />
+                                                <Text style={tw`text-amber-400 font-[InterTight-Medium] text-[13px]`}>
+                                                    {step.isCertification ? 'Professional Certificate' : 'Certificate Included'}
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
                                 </TouchableOpacity>
                             ))}

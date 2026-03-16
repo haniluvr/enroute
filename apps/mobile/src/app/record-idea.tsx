@@ -52,6 +52,8 @@ import Animated, {
     Layout
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 const { width, height } = Dimensions.get('window');
 
@@ -64,9 +66,12 @@ type Message = {
 type FlowState = 'IDLE' | 'RECORDING' | 'PROCESSING' | 'REFINE';
 
 export default function RecordIdeaScreen() {
+    const { user } = useAuth();
     const router = useRouter();
     const [state, setState] = useState<FlowState>('IDLE');
     const [showUploadModal, setShowUploadModal] = useState(false);
+    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
     const [seconds, setSeconds] = useState(0);
     const [transcription, setTranscription] = useState("I'm thinking about transitioning into UI Engineering. I have a strong background in backend development but I've always been more interested in the visual and interactive side of things. I want to build premium experiences.");
     const [messages, setMessages] = useState<Message[]>([
@@ -101,13 +106,34 @@ export default function RecordIdeaScreen() {
         }
     }, [state]);
 
-    // Mock processing transition
+    // Start Conversation in Supabase
+    const startIdeaConversation = async () => {
+        if (!user || user.id === 'pending') return;
+        try {
+            const { data, error } = await supabase
+                .from('conversations')
+                .insert({
+                    user_id: user.id,
+                    coach_persona: 'IdeaBot',
+                    title: 'New Idea Record',
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            setConversationId(data.id);
+            return data.id;
+        } catch (err) {
+            console.error('Start Idea Error:', err);
+        }
+    };
+
+    // Transitions
     useEffect(() => {
-        if (state === 'PROCESSING') {
-            const timer = setTimeout(() => {
-                setState('REFINE');
-            }, 3000);
-            return () => clearTimeout(timer);
+        if (state === 'PROCESSING' && !conversationId) {
+            startIdeaConversation().then(() => {
+                setTimeout(() => setState('REFINE'), 2000);
+            });
         }
     }, [state]);
 
@@ -151,8 +177,36 @@ export default function RecordIdeaScreen() {
         }
     };
 
-    const handleSave = () => {
-        Alert.alert("Success", "Idea saved to your library.");
+    const handleSave = async () => {
+        if (!user || !conversationId) return;
+        setIsSaving(true);
+        try {
+            // Save messages if any
+            if (messages.length > 0) {
+                const messagesToInsert = messages.map(msg => ({
+                    conversation_id: conversationId,
+                    role: msg.role,
+                    content: msg.content
+                }));
+                await supabase.from('conversation_messages').insert(messagesToInsert);
+            }
+
+            // Mark as library item
+            await supabase.from('library_saves').insert({
+                user_id: user.id,
+                item_type: 'idea',
+                item_id: conversationId,
+                title: transcription.substring(0, 50) + '...'
+            });
+
+            Alert.alert("Success", "Idea saved to your library.");
+            router.replace('/library');
+        } catch (err) {
+            console.error('Save Idea Error:', err);
+            Alert.alert("Error", "Failed to save idea.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleFileUpload = async (type: 'photos' | 'camera' | 'files') => {
@@ -173,8 +227,8 @@ export default function RecordIdeaScreen() {
         }
     };
 
-    const handleSendMessage = () => {
-        if (!inputText.trim()) return;
+    const handleSendMessage = async () => {
+        if (!inputText.trim() || !conversationId) return;
 
         const newMessage: Message = {
             role: 'user',
@@ -183,19 +237,38 @@ export default function RecordIdeaScreen() {
         };
 
         setMessages(prev => [...prev, newMessage]);
+        const currentInput = inputText;
         setInputText('');
         Keyboard.dismiss();
 
-        // Mock AI response
-        setTimeout(() => {
-            const aiResponse: Message = {
-                role: 'assistant',
-                content: "Focusing on premium experiences is a high-value niche. You should definitely look into Framer Motion and React Native Reanimated. Since you have a backend background, you can also specialize in 'Full-stack UI'—optimizing the bridge between APIs and fluid interactions.",
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, aiResponse]);
-            scrollViewRef.current?.scrollToEnd({ animated: true });
-        }, 1000);
+        try {
+            await supabase.from('conversation_messages').insert({
+                conversation_id: conversationId,
+                role: 'user',
+                content: currentInput
+            });
+
+            // Mock AI response for now
+            setTimeout(async () => {
+                const aiContent = "Focusing on premium experiences is a high-value niche. You should definitely look into Framer Motion and React Native Reanimated. Since you have a backend background, you can also specialize in 'Full-stack UI'—optimizing the bridge between APIs and fluid interactions.";
+                const aiResponse: Message = {
+                    role: 'assistant',
+                    content: aiContent,
+                    timestamp: new Date()
+                };
+                setMessages(prev => [...prev, aiResponse]);
+                
+                await supabase.from('conversation_messages').insert({
+                    conversation_id: conversationId,
+                    role: 'assistant',
+                    content: aiContent
+                });
+
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 1000);
+        } catch (err) {
+            console.error('Send Message Error:', err);
+        }
     };
 
     const renderHeader = () => (

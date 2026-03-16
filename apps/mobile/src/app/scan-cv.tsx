@@ -30,6 +30,8 @@ import {
     RefreshCw
 } from 'lucide-react-native';
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -71,10 +73,12 @@ const MenuItem = ({ label, icon: Icon, onPress, isLast, isDestructive }: MenuIte
 );
 
 export default function ScanCVScreen() {
+    const { user } = useAuth();
     const router = useRouter();
     const cameraRef = useRef<CameraView>(null);
     const [state, setState] = useState<FlowState>('INTRO');
     const [pickerType, setPickerType] = useState<PickerType>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     const [permission, requestPermission] = useCameraPermissions();
     const [libraryPermission, requestLibraryPermission] = ImagePicker.useMediaLibraryPermissions();
@@ -150,57 +154,86 @@ export default function ScanCVScreen() {
         setState('ANALYZING');
     };
 
+    const uploadCV = async (uri: string, name: string, type: string) => {
+        if (!user || user.id === 'pending') return;
+        setIsUploading(true);
+        try {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            const fileName = `${user.id}/${Date.now()}_${name}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('cv_uploads')
+                .upload(fileName, blob, { contentType: type });
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('cv_uploads')
+                .getPublicUrl(fileName);
+
+            // Mock skills for now
+            const detected_skills = ['Javascript dev', 'API Integration', 'React framework', 'UI/UX Design'];
+            const suggested_skills = ['Version control', 'SEO', 'Technical writing', 'Git & Github'];
+
+            const { data: scanData, error: scanError } = await supabase
+                .from('cv_scans')
+                .insert({
+                    user_id: user.id,
+                    file_url: publicUrl,
+                    detected_skills,
+                    suggested_skills,
+                    analysis_result: {
+                        score: 85,
+                        feedback: "Great experience in frontend technologies."
+                    }
+                })
+                .select()
+                .single();
+
+            if (scanError) throw scanError;
+
+            setState('RESULT');
+        } catch (err) {
+            console.error('CV Upload Error:', err);
+            Alert.alert("Error", "Failed to upload and analyze CV.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleFileUpload = async (source: 'photos' | 'camera' | 'files') => {
-        console.log(`[ScanCV] handleFileUpload selected: ${source}`);
-        setPickerType(null); // Close the menu immediately
+        setPickerType(null);
+        if (!user) return;
 
-        // Wait for Modal to fully disappear
         setTimeout(async () => {
-            console.log(`[ScanCV] Launching system UI for: ${source}`);
-
             try {
+                let result: any;
                 if (source === 'camera') {
                     handleTakePhotoClick();
+                    return;
                 } else if (source === 'photos') {
-                    console.log('[ScanCV] Calling launchImageLibraryAsync...');
-                    const result = await ImagePicker.launchImageLibraryAsync({
+                    result = await ImagePicker.launchImageLibraryAsync({
                         mediaTypes: ['images'],
                         allowsEditing: true,
                         aspect: [5, 7],
-                        quality: 1,
+                        quality: 0.8,
                     });
-                    console.log(`[ScanCV] ImagePicker result: ${JSON.stringify(result)}`);
-
-                    if (!result.canceled && result.assets && result.assets.length > 0) {
-                        setCapturedImage(result.assets[0].uri);
-                        setSelectedFile(null); // IMPORTANT: Clear PDF data when image is picked
-                        setSourceType('GALLERY');
-                        setState('UPLOADING');
-                    }
                 } else if (source === 'files') {
-                    console.log('[ScanCV] Calling getDocumentAsync...');
-                    const result = await DocumentPicker.getDocumentAsync({
+                    result = await DocumentPicker.getDocumentAsync({
                         type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
                         copyToCacheDirectory: true,
                     });
-                    console.log(`[ScanCV] DocumentPicker result: ${JSON.stringify(result)}`);
+                }
 
-                    if (!result.canceled && result.assets && result.assets.length > 0) {
-                        const file = result.assets[0];
-                        setCapturedImage(file.uri); // On iOS, Image component often supports PDF preview
-                        setSourceType('FILE');
-                        setSelectedFile({
-                            uri: file.uri,
-                            name: file.name,
-                            isPdf: file.name.toLowerCase().endsWith('.pdf') || file.mimeType === 'application/pdf'
-                        });
-                        console.log(`[ScanCV] File picked: ${file.name}, bits: ${file.uri.substring(0, 30)}...`);
-                        setState('UPLOADING');
-                    }
+                if (result && !result.canceled && result.assets && result.assets.length > 0) {
+                    const asset = result.assets[0];
+                    setState('UPLOADING');
+                    await uploadCV(asset.uri, asset.name || `cv_${Date.now()}`, asset.mimeType || 'application/octet-stream');
                 }
             } catch (err) {
-                console.error(`[ScanCV] Error launching ${source}:`, err);
-                Alert.alert("Error", `Could not open ${source}. Please try again.`);
+                console.error(err);
+                Alert.alert("Error", "Could not select file.");
             }
         }, 800);
     };

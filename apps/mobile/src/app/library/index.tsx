@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Keyboard } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Keyboard, ActivityIndicator } from 'react-native';
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
@@ -14,6 +14,8 @@ import {
     ChevronRight,
     Trash2
 } from 'lucide-react-native';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 const CATEGORIES = [
     { id: 'ideas', name: 'Recorded Ideas', icon: Mic, color: '#FF9500' },
@@ -23,15 +25,45 @@ const CATEGORIES = [
 ];
 
 export default function LibraryScreen() {
+    const { user } = useAuth();
     const router = useRouter();
-    const [recentItems, setRecentItems] = React.useState([
-        { id: 1, title: "UI/UX Design Roadmap", subtitle: "Updated 2 days ago", type: "roadmap" },
-        { id: 2, title: "Voice Idea: App Concept", subtitle: "Recorded yesterday", type: "idea" },
-        { id: 3, title: "Dahlia Conversation", subtitle: "Career advice session", type: "conversation" },
-        { id: 4, title: "Product Management 101", subtitle: "Downloaded Resource", type: "resource" },
-    ]);
+    const [recentItems, setRecentItems] = React.useState<any[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
 
-    const handleDelete = (id: number) => {
+    React.useEffect(() => {
+        fetchLibraryItems();
+    }, [user]);
+
+    const fetchLibraryItems = async () => {
+        if (!user || user.id === 'pending') return;
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('library_saves')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            if (error) throw error;
+            
+            const transformedItems = data.map(item => ({
+                id: item.id,
+                title: item.title || `${item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1)}`,
+                subtitle: `Saved ${new Date(item.created_at).toLocaleDateString()}`,
+                type: item.item_type,
+                itemId: item.item_id
+            }));
+
+            setRecentItems(transformedItems);
+        } catch (err) {
+            console.error('Fetch Library Error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
         Alert.alert(
             "Delete Item",
             "Are you sure you want to remove this item from your library?",
@@ -39,7 +71,19 @@ export default function LibraryScreen() {
                 { text: "Cancel", style: "cancel" },
                 { 
                     text: "Delete", 
-                    onPress: () => setRecentItems(prev => prev.filter(item => item.id !== id)),
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('library_saves')
+                                .delete()
+                                .eq('id', id);
+                            
+                            if (error) throw error;
+                            setRecentItems(prev => prev.filter(item => item.id !== id));
+                        } catch (err) {
+                            console.error('Delete Library Item Error:', err);
+                        }
+                    },
                     style: "destructive" 
                 }
             ]
@@ -62,8 +106,18 @@ export default function LibraryScreen() {
         );
     };
 
-    const renderItem = (id: number, title: string, subtitle: string, type: string) => (
-        <TouchableOpacity activeOpacity={0.7} style={tw`mb-4`}>
+    const renderItem = (id: string, title: string, subtitle: string, type: string, itemId: string) => (
+        <TouchableOpacity 
+            key={id}
+            activeOpacity={0.7} 
+            style={tw`mb-4`}
+            onPress={() => {
+                if (type === 'roadmap') router.push(`/roadmap-details/${itemId}`);
+                else if (type === 'conversation') router.push('/(tabs)/dahlia');
+                else if (type === 'idea') router.push('/record-idea');
+                else Alert.alert("Coming soon", "This feature is being developed.");
+            }}
+        >
             <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10`} noPadding>
                 <View style={tw`flex-row justify-between items-center`}>
                     <View style={tw`flex-1`}>
@@ -164,12 +218,16 @@ export default function LibraryScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {recentItems.length === 0 ? (
+                    {isLoading ? (
+                        <View style={tw`py-10 items-center`}>
+                            <ActivityIndicator color="#fff" />
+                        </View>
+                    ) : recentItems.length === 0 ? (
                         <View style={tw`py-10 items-center`}>
                             <Text style={tw`text-gray-500 font-[InterTight]`}>No recent activity</Text>
                         </View>
                     ) : (
-                        recentItems.map(item => renderItem(item.id, item.title, item.subtitle, item.type))
+                        recentItems.map(item => renderItem(item.id, item.title, item.subtitle, item.type, item.itemId))
                     )}
                 </View>
             </ScrollView>

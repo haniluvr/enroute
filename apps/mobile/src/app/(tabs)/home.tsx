@@ -5,10 +5,48 @@ import { GlassCard } from '@/components/GlassCard';
 import { useAuth } from '@/hooks/useAuth';
 import { FolderOpen, Sparkles, Mic, Telescope, MapPlus, ScanText, ChevronRight, GraduationCap } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/config/supabase';
 
 export default function HomeScreen() {
     const { user } = useAuth();
     const router = useRouter();
+    const [historyItems, setHistoryItems] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        fetchHistory();
+    }, [user]);
+
+    const fetchHistory = async () => {
+        if (!user || user.id === 'pending') return;
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('library_saves')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(4);
+
+            if (error) throw error;
+
+            const transformed = data.map(item => ({
+                id: item.id,
+                type: item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1),
+                title: item.title || `${item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1)}`,
+                detail: `Saved ${new Date(item.created_at).toLocaleDateString()}`,
+                progress: 1.0,
+                itemId: item.item_id
+            }));
+
+            setHistoryItems(transformed);
+        } catch (err) {
+            console.error('Fetch History Error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Priority: nickname first, then first name, lastly User
     const displayName = user?.user_metadata?.nickname || user?.user_metadata?.first_name || 'User';
@@ -125,45 +163,52 @@ export default function HomeScreen() {
                 <View style={tw`px-6`}>
                     <Text style={tw`text-gray-300 font-[InterTight-Medium] text-[17px] mb-5`}>History</Text>
 
-                    {[
-                        { id: 1, type: 'Roadmap', title: 'UI/UX Engineering Path', detail: '80% Complete', status: 'In Progress', progress: 0.8 },
-                        { id: 2, type: 'Interview', title: 'Prep with Dahlia', detail: 'Mock Interview: Senior Designer', status: 'Completed', progress: 1.0 },
-                        { id: 3, type: 'Scan', title: 'Resume Analysis', detail: '4 skills detected', status: 'Completed', progress: 1.0 }
-                    ].map((activity) => (
-                        <TouchableOpacity 
-                            key={activity.id}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                                if (activity.type === 'Roadmap') router.push('/library/roadmaps');
-                                else if (activity.type === 'Interview') router.push('/library/conversations');
-                                else if (activity.type === 'Scan') router.push('/library/resources');
-                                else router.push('/library');
-                            }}
-                        >
-                            <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10 mb-4`} noPadding>
-                                <View style={tw`flex-row justify-between items-center mb-4`}>
-                                    <View style={tw`bg-[#2b4e50] px-3 py-1.5 rounded-full flex-row items-center border border-white/10`}>
-                                        <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>{activity.type}</Text>
+                    {isLoading ? (
+                        <View style={tw`py-10 items-center`}>
+                            <Text style={tw`text-gray-500 font-[InterTight]`}>Updating history...</Text>
+                        </View>
+                    ) : historyItems.length === 0 ? (
+                        <View style={tw`py-10 items-center`}>
+                            <Text style={tw`text-gray-500 font-[InterTight]`}>No recent activity yet</Text>
+                        </View>
+                    ) : (
+                        historyItems.map((activity) => (
+                            <TouchableOpacity 
+                                key={activity.id}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                    if (activity.type === 'Roadmap') router.push(`/roadmap-details/${activity.itemId}`);
+                                    else if (activity.type === 'Conversation') router.push('/(tabs)/dahlia');
+                                    else if (activity.type === 'Resource') router.push('/scan-cv');
+                                    else if (activity.type === 'Idea') router.push('/record-idea');
+                                    else router.push('/library');
+                                }}
+                            >
+                                <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10 mb-4`} noPadding>
+                                    <View style={tw`flex-row justify-between items-center mb-4`}>
+                                        <View style={tw`bg-[#2b4e50] px-3 py-1.5 rounded-full flex-row items-center border border-white/10`}>
+                                            <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>{activity.type}</Text>
+                                        </View>
+                                        <View style={tw`bg-white/10 w-8 h-8 rounded-full items-center justify-center`}>
+                                            <ChevronRight color="#888" size={18} />
+                                        </View>
                                     </View>
-                                    <View style={tw`bg-white/10 w-8 h-8 rounded-full items-center justify-center`}>
-                                        <ChevronRight color="#888" size={18} />
+
+                                    <Text style={tw`text-white font-[InterTight-Medium] text-[16px] mb-1`}>
+                                        {activity.title}
+                                    </Text>
+                                    <Text style={tw`text-gray-400 font-[InterTight] text-sm mb-4`}>
+                                        {activity.detail}
+                                    </Text>
+
+                                    {/* Progress Bar */}
+                                    <View style={tw`w-full h-1 bg-white/10 rounded-full overflow-hidden`}>
+                                        <View style={[tw`h-full bg-white rounded-full`, { width: `${activity.progress * 100}%` }]} />
                                     </View>
-                                </View>
-
-                                <Text style={tw`text-white font-[InterTight-Medium] text-[16px] mb-1`}>
-                                    {activity.title}
-                                </Text>
-                                <Text style={tw`text-gray-400 font-[InterTight] text-sm mb-4`}>
-                                    {activity.detail}
-                                </Text>
-
-                                {/* Progress Bar */}
-                                <View style={tw`w-full h-1 bg-white/10 rounded-full overflow-hidden`}>
-                                    <View style={[tw`h-full bg-white rounded-full`, { width: `${activity.progress * 100}%` }]} />
-                                </View>
-                            </GlassCard>
-                        </TouchableOpacity>
-                    ))}
+                                </GlassCard>
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </View>
 
             </ScrollView>

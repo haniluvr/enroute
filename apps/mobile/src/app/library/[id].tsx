@@ -77,7 +77,18 @@ export default function LibraryCategoryScreen() {
     };
 
     const renderItem = (item: any) => (
-        <TouchableOpacity activeOpacity={0.7} style={tw`mb-4`} key={item.id}>
+        <TouchableOpacity 
+            activeOpacity={0.7} 
+            style={tw`mb-4`} 
+            key={item.id}
+            onPress={() => {
+                if (item.type === 'roadmap') router.push(`/roadmap-details/${item.id}`);
+                else if (item.type === 'conversation') router.push('/(tabs)/dahlia');
+                else if (item.type === 'idea') router.push('/record-idea');
+                // For resources, we could link to a preview or just show an alert for now
+                else Alert.alert("Coming soon", "This feature is being developed.");
+            }}
+        >
             <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10`} noPadding>
                 <View style={tw`flex-row justify-between items-center`}>
                     <View style={tw`flex-1`}>

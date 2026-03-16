@@ -5,16 +5,20 @@ import { ChevronLeft, CheckCircle2, ClipboardPen } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import { CAREER_APTITUDE_QUESTIONS } from '@/data/career-aptitude-questions';
 
 type ScreenState = 'intro' | 'quiz' | 'result';
 
 export default function CareerAptitudeTestScreen() {
+    const { user } = useAuth();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [screenState, setScreenState] = useState<ScreenState>('intro');
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
 
     // Progress bar animation
     const progressAnim = useRef(new Animated.Value(0)).current;
@@ -50,11 +54,37 @@ export default function CareerAptitudeTestScreen() {
         }));
     };
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (currentStep < CAREER_APTITUDE_QUESTIONS.length - 1) {
             setCurrentStep(prev => prev + 1);
         } else {
+            await saveAssessmentResults();
             setScreenState('result');
+        }
+    };
+
+    const saveAssessmentResults = async () => {
+        if (!user || user.id === 'pending') return;
+        setIsSaving(true);
+        try {
+            // Mock AI analysis for now
+            const aiSuggestion = "Based on your focus on product design and visual aesthetics, UI Architecture or Design Engineering would be a perfect fit.";
+            const matchPercentage = 88;
+
+            const { error } = await supabase
+                .from('career_assessments')
+                .insert({
+                    user_id: user.id,
+                    answers: answers,
+                    ai_career_suggestion: aiSuggestion,
+                    match_percentage: matchPercentage
+                });
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Save Assessment Error:', err);
+        } finally {
+            setIsSaving(false);
         }
     };
 

@@ -3,24 +3,50 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-nativ
 import { GlassBackground } from '@/components/GlassBackground';
 import { Search, Sparkles } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
 import { PathCard } from '@/components/path/PathCard';
 import { PathCardResult } from '@/components/path/PathCardResult';
 import { suggestedPaths } from '@/data/pathMockData';
 
 export default function PathScreen() {
+    const { user } = useAuth();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
+    const [paths, setPaths] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        fetchPaths();
+    }, []);
+
+    const fetchPaths = async () => {
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('learning_paths')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setPaths(data || []);
+        } catch (err) {
+            console.error('Fetch Paths Error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const filteredPaths = useMemo(() => {
-        if (!searchQuery.trim()) return suggestedPaths;
+        if (!searchQuery.trim()) return paths;
         const q = searchQuery.toLowerCase();
-        return suggestedPaths.filter(
+        return paths.filter(
             (p) =>
                 p.title.toLowerCase().includes(q) ||
-                p.description.toLowerCase().includes(q)
+                (p.overview && p.overview.toLowerCase().includes(q))
         );
-    }, [searchQuery]);
+    }, [searchQuery, paths]);
 
     const showSearchResults = searchQuery.trim().length > 0;
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Switch } from 'react-native';
-import { Shield, ChevronLeft, Key, Eye, UserX, ChevronRight, Lock } from 'lucide-react-native';
+import { Shield, ChevronLeft, Key, Eye, UserX, ChevronRight, Lock, MapPin } from 'lucide-react-native';
 import tw from '@/lib/tailwind';
 import { GlassCard } from '@/components/GlassCard';
 import { GlassBackground } from '@/components/GlassBackground';
@@ -45,6 +45,7 @@ const SecurityOption = ({
 export default function PrivacyScreen() {
     const [twoFactor, setTwoFactor] = useState(false);
     const [dataSharing, setDataSharing] = useState(true);
+    const [shareLocation, setShareLocation] = useState(false);
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
@@ -107,6 +108,22 @@ export default function PrivacyScreen() {
                                     thumbColor={dataSharing ? '#ffffff' : '#f4f3f4'}
                                     onValueChange={setDataSharing}
                                     value={dataSharing}
+                                />
+                            </View>
+                            <View style={tw`h-[1px] bg-white/10 w-full`} />
+                            <View style={tw`flex-row items-center py-4`}>
+                                <View style={tw`w-10 h-10 rounded-xl bg-white/5 items-center justify-center mr-4`}>
+                                    <MapPin size={20} color="#FFFFFF" />
+                                </View>
+                                <View style={tw`flex-1 mr-4`}>
+                                    <Text style={tw`text-white text-lg font-inter-semibold`}>Share Location</Text>
+                                    <Text style={tw`text-white/60 text-sm font-inter`}>Allow Enroute to access your location</Text>
+                                </View>
+                                <Switch
+                                    trackColor={{ false: '#3e3e3e', true: '#34C759' }}
+                                    thumbColor={shareLocation ? '#ffffff' : '#f4f3f4'}
+                                    onValueChange={setShareLocation}
+                                    value={shareLocation}
                                 />
                             </View>
                         </GlassCard>

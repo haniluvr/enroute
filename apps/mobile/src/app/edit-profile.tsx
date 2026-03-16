@@ -7,6 +7,7 @@ import { GlassBackground } from '@/components/GlassBackground';
 import { router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/config/supabase';
+import * as ImagePicker from 'expo-image-picker';
 
 
 interface EditFieldProps {
@@ -59,6 +60,8 @@ export default function EditProfileScreen() {
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [nickname, setNickname] = useState('');
+    const [avatarUrl, setAvatarUrl] = useState('');
+    const [newImageUri, setNewImageUri] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const firstNameRef = React.useRef<TextInput>(null);
@@ -74,25 +77,134 @@ export default function EditProfileScreen() {
             setPhone(user.user_metadata?.phone || '');
             setEmail(user.email || '');
             setNickname(user.user_metadata?.nickname || '');
+            setAvatarUrl(user.user_metadata?.avatar_url || '');
         }
     }, [user]);
+
+    const handlePickImage = async () => {
+        Alert.alert(
+            "Change Profile Photo",
+            "Choose a source",
+            [
+                {
+                    text: "Camera",
+                    onPress: handleCaptureImage
+                },
+                {
+                    text: "Photo Gallery",
+                    onPress: handleOpenGallery
+                },
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                }
+            ]
+        );
+    };
+
+    const handleOpenGallery = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setNewImageUri(result.assets[0].uri);
+        }
+    };
+
+    const handleCaptureImage = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            setNewImageUri(result.assets[0].uri);
+        }
+    };
+
+    const uploadAvatar = async (uri: string) => {
+        if (!user || user.id === 'pending') return null;
+        try {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            const fileExt = uri.split('.').pop();
+            const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+            const filePath = `public/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, blob, { contentType: `image/${fileExt}`, upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            return publicUrl;
+        } catch (error) {
+            console.error('Upload avatar error:', error);
+            return null;
+        }
+    };
 
     const handleSave = async () => {
         setIsLoading(true);
         try {
-            const { error } = await supabase.auth.updateUser({
+            let currentAvatarUrl = avatarUrl;
+            if (newImageUri) {
+                const uploadedUrl = await uploadAvatar(newImageUri);
+                if (uploadedUrl) currentAvatarUrl = uploadedUrl;
+            }
+
+            // 1. Update Auth Metadata
+            const { error: authError } = await supabase.auth.updateUser({
                 email: email,
                 data: {
                     first_name: firstName,
                     last_name: lastName,
                     phone: phone,
                     nickname: nickname,
+                    avatar_url: currentAvatarUrl
                 }
             });
 
-            if (error) {
-                Alert.alert('Error', error.message);
+            if (authError) {
+                Alert.alert('Error', authError.message);
                 return;
+            }
+
+            // 2. Update Public Profile Table
+            if (user?.id) {
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({
+                        first_name: firstName,
+                        last_name: lastName,
+                        phone: phone,
+                        nickname: nickname,
+                        email: email,
+                        avatar_url: currentAvatarUrl,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', user.id);
+
+                if (profileError) {
+                    console.error('Profile Table Update Error:', profileError.message);
+                    // We don't necessarily want to block the user if the profile table update fails 
+                    // but auth metadata succeeded, though it depends on requirements.
+                }
             }
 
             await refreshUser();
@@ -134,10 +246,11 @@ export default function EditProfileScreen() {
                             <View style={tw`items-center mb-10 mt-10`}>
                                 <View style={tw`relative`}>
                                     <Image
-                                        source={{ uri: user?.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop' }}
+                                        source={{ uri: newImageUri || avatarUrl || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop' }}
                                         style={tw`w-28 h-28 rounded-full border-2 border-white/20`}
                                     />
                                     <TouchableOpacity
+                                        onPress={handlePickImage}
                                         style={tw`absolute bottom-0 right-0 bg-white/20 p-2.5 rounded-full border border-white/20 backdrop-blur-md`}
                                     >
                                         <Camera size={20} color="white" />
