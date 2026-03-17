@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { AI_API } from '@/config/backend';
 
 const COMMON_SKILLS = [
     'JavaScript', 'Python', 'React', 'Node.js', 'SQL', 'Git', 'AWS', 'Docker', 'UI/UX Design', 'Agile', 'Figma', 'TypeScript'
@@ -36,50 +37,23 @@ export default function RoadmapScreen() {
         setIsGenerating(true);
         
         try {
-            // 1. Mock AI generation (Delay)
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // 1. Call Backend AI for Roadmap Generation
+            const response = await fetch(AI_API.ROADMAP, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    goal,
+                    currentSkills: selectedSkills
+                })
+            });
 
-            let mockData: any;
+            const data = await response.json();
             
-            const lowerGoal = goal.toLowerCase();
-            if (lowerGoal.includes('data') || lowerGoal.includes('python') || lowerGoal.includes('analysis')) {
-                mockData = {
-                    time: '8 Months',
-                    salary: '$90k - $140k',
-                    demand: 'Critical',
-                    steps: [
-                        { title: 'Google Data Analytics Professional Certificate', description: 'Master data cleaning, analysis, and visualization with SQL, R, and Tableau.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
-                        { title: 'IBM Data Science Professional Certificate', description: 'Learn Python, SQL, and Machine Learning. Build data-driven models.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
-                        { title: 'Applied Data Science with Python Specialization', description: 'Deep dive into data visualization, text mining, and social network analysis.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
-                        { title: 'Capstone: Real-world Business Analysis', description: 'Apply analytics to solve a real business problem and present your findings.', platform: 'Enroute AI', hasCertificate: false, isCertification: false, completed: false }
-                    ]
-                };
-            } else if (lowerGoal.includes('web') || lowerGoal.includes('developer') || lowerGoal.includes('full stack')) {
-                mockData = {
-                    time: '9 Months',
-                    salary: '$85k - $130k',
-                    demand: 'Very High',
-                    steps: [
-                        { title: 'Meta Front-End Developer Professional Certificate', description: 'Master HTML, CSS, JavaScript, and React to build responsive web apps.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
-                        { title: 'Meta Back-End Developer Professional Certificate', description: 'Learn Python, Django, and database management for scalable back-ends.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
-                        { title: 'Full Stack Web Development (HKUST)', description: 'Implement complex server-side logic and integrate with front-end frameworks.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
-                        { title: 'Deployment & System Architecture', description: 'Deploy your applications using AWS/GCP and learn CI/CD best practices.', platform: 'Enroute AI', hasCertificate: false, isCertification: false, completed: false }
-                    ]
-                };
-            } else {
-                // Default UI/UX or general creative path
-                mockData = {
-                    time: '6 Months',
-                    salary: '$80k - $120k',
-                    demand: 'High',
-                    steps: [
-                        { title: 'Google UX Design Professional Certificate', description: 'Foundations of User Experience (UX) Design, wireframing, and user research.', platform: 'Coursera', hasCertificate: true, isCertification: true, completed: false },
-                        { title: 'UI/UX Design Specialization (CalArts)', description: 'Visual elements, strategy, and design fundamentals. Learn visual hierarchies.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
-                        { title: 'Interaction Design Specialization', description: 'Deep dive into user research techniques, storyboarding, and rapid prototyping.', platform: 'Coursera', hasCertificate: true, isCertification: false, completed: false },
-                        { title: 'Portfolio Development & Practice', description: 'Apply your skills to real-world projects and build a professional design portfolio.', platform: 'Enroute AI', hasCertificate: false, isCertification: false, completed: false }
-                    ]
-                };
+            if (!data.roadmap || !Array.isArray(data.roadmap)) {
+                throw new Error('Invalid roadmap data received');
             }
+
+            const aiGeneratedSteps = data.roadmap;
 
             // 2. Save Roadmap to Supabase
             const { data: roadmap, error: roadmapError } = await supabase
@@ -87,9 +61,9 @@ export default function RoadmapScreen() {
                 .insert({
                     user_id: user.id,
                     goal: goal,
-                    estimated_duration: mockData.time,
-                    salary_range: mockData.salary,
-                    demand_level: mockData.demand,
+                    estimated_duration: '6-8 Months', // AI could generate this too
+                    salary_range: '$80k - $120k',
+                    demand_level: 'High',
                     current_skills: selectedSkills
                 })
                 .select()
@@ -98,14 +72,14 @@ export default function RoadmapScreen() {
             if (roadmapError) throw roadmapError;
 
             // 3. Save Steps
-            const stepsToInsert = mockData.steps.map((step: any, index: number) => ({
+            const stepsToInsert = aiGeneratedSteps.map((step: any, index: number) => ({
                 roadmap_id: roadmap.id,
                 title: step.title,
                 description: step.description,
-                is_completed: step.completed,
-                educational_platform: step.platform,
-                has_certification: step.hasCertificate,
-                is_professional_cert: step.isCertification,
+                is_completed: false,
+                educational_platform: step.platform || 'General',
+                has_certification: !!step.platform && step.platform.toLowerCase().includes('coursera'),
+                is_professional_cert: false,
                 order: index
             }));
 
@@ -118,7 +92,9 @@ export default function RoadmapScreen() {
 
             setRoadmapId(roadmap.id);
             setRoadmapData({
-                ...mockData,
+                time: roadmap.estimated_duration,
+                salary: roadmap.salary_range,
+                demand: roadmap.demand_level,
                 id: roadmap.id,
                 steps: savedSteps
             });

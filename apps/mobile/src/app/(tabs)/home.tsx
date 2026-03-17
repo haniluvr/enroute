@@ -19,15 +19,29 @@ export default function HomeScreen() {
     }, [user]);
 
     const fetchHistory = async () => {
-        if (!user || user.id === 'pending') return;
+        if (!user) return;
         setIsLoading(true);
+        // If pending, we might not have many saves, but we'll try
+        const userId = user.id === 'pending' ? null : user.id;
         try {
-            const { data, error } = await supabase
+            const query = supabase
                 .from('library_saves')
                 .select('*')
-                .eq('user_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(4);
+            
+            if (userId) {
+                query.eq('user_id', userId);
+            } else {
+                // If pending, maybe we filter by session or just return empty for now
+                // Actually if they are pending but somehow saved things locally, 
+                // we'd need another way. For now, just let it fail gracefully or return nothing.
+                setHistoryItems([]);
+                setIsLoading(false);
+                return;
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
 
@@ -160,19 +174,10 @@ export default function HomeScreen() {
                 </View>
 
                 {/* History Section */}
-                <View style={tw`px-6`}>
-                    <Text style={tw`text-gray-300 font-[InterTight-Medium] text-[17px] mb-5`}>History</Text>
-
-                    {isLoading ? (
-                        <View style={tw`py-10 items-center`}>
-                            <Text style={tw`text-gray-500 font-[InterTight]`}>Updating history...</Text>
-                        </View>
-                    ) : historyItems.length === 0 ? (
-                        <View style={tw`py-10 items-center`}>
-                            <Text style={tw`text-gray-500 font-[InterTight]`}>No recent activity yet</Text>
-                        </View>
-                    ) : (
-                        historyItems.map((activity) => (
+                {!isLoading && historyItems.length > 0 && (
+                    <View style={tw`px-6`}>
+                        <Text style={tw`text-gray-300 font-[InterTight-Medium] text-[17px] mb-5`}>History</Text>
+                        {historyItems.map((activity) => (
                             <TouchableOpacity 
                                 key={activity.id}
                                 activeOpacity={0.8}
@@ -207,9 +212,15 @@ export default function HomeScreen() {
                                     </View>
                                 </GlassCard>
                             </TouchableOpacity>
-                        ))
-                    )}
-                </View>
+                        ))}
+                    </View>
+                )}
+
+                {isLoading && (
+                    <View style={tw`px-6 py-10 items-center`}>
+                        <Text style={tw`text-gray-500 font-[InterTight]`}>Updating history...</Text>
+                    </View>
+                )}
 
             </ScrollView>
         </GlassBackground>

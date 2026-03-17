@@ -35,8 +35,13 @@ export default function LibraryScreen() {
     }, [user]);
 
     const fetchLibraryItems = async () => {
-        if (!user || user.id === 'pending') return;
+        if (!user) return;
         setIsLoading(true);
+        if (user.id === 'pending') {
+            setRecentItems([]);
+            setIsLoading(false);
+            return;
+        }
         try {
             const { data, error } = await supabase
                 .from('library_saves')
@@ -210,26 +215,23 @@ export default function LibraryScreen() {
                 </View>
 
                 {/* Recent Items */}
-                <View style={tw`px-6`}>
-                    <View style={tw`flex-row justify-between items-center mb-5`}>
-                        <Text style={tw`text-gray-300 font-[InterTight-Medium] text-[17px]`}>Recent Activity</Text>
-                        <TouchableOpacity onPress={handleClearAll}>
-                            <Text style={tw`text-white/40 font-[InterTight] text-sm`}>Clear all</Text>
-                        </TouchableOpacity>
+                {!isLoading && recentItems.length > 0 && (
+                    <View style={tw`px-6`}>
+                        <View style={tw`flex-row justify-between items-center mb-5`}>
+                            <Text style={tw`text-gray-300 font-[InterTight-Medium] text-[17px]`}>Recent Activity</Text>
+                            <TouchableOpacity onPress={handleClearAll}>
+                                <Text style={tw`text-white/40 font-[InterTight] text-sm`}>Clear all</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {recentItems.map(item => renderItem(item.id, item.title, item.subtitle, item.type, item.itemId))}
                     </View>
+                )}
 
-                    {isLoading ? (
-                        <View style={tw`py-10 items-center`}>
-                            <ActivityIndicator color="#fff" />
-                        </View>
-                    ) : recentItems.length === 0 ? (
-                        <View style={tw`py-10 items-center`}>
-                            <Text style={tw`text-gray-500 font-[InterTight]`}>No recent activity</Text>
-                        </View>
-                    ) : (
-                        recentItems.map(item => renderItem(item.id, item.title, item.subtitle, item.type, item.itemId))
-                    )}
-                </View>
+                {isLoading && (
+                    <View style={tw`py-10 items-center`}>
+                        <ActivityIndicator color="#fff" />
+                    </View>
+                )}
             </ScrollView>
         </GlassBackground>
     );

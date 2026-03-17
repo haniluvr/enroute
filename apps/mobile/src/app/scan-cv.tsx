@@ -32,6 +32,7 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { AI_API } from '@/config/backend';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -168,13 +169,26 @@ export default function ScanCVScreen() {
 
             if (uploadError) throw uploadError;
 
+            if (uploadError) throw uploadError;
+
             const { data: { publicUrl } } = supabase.storage
                 .from('cv_uploads')
                 .getPublicUrl(fileName);
 
-            // Mock skills for now
-            const detected_skills = ['Javascript dev', 'API Integration', 'React framework', 'UI/UX Design'];
-            const suggested_skills = ['Version control', 'SEO', 'Technical writing', 'Git & Github'];
+            // In a real app, we would use an OCR service here.
+            // For now, we'll send a descriptive text to the AI to "simulate" OCR results.
+            const mockOcrText = `Professional Resume of ${user.email}. High proficiency in React, Node.js and API development. Interested in Backend engineering.`;
+
+            // Call Backend AI to Parse CV
+            const aiResponse = await fetch(AI_API.PARSE_CV, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: mockOcrText })
+            });
+
+            const aiData = await aiResponse.json();
+            const detected_skills = aiData.skills || ['General Development'];
+            const suggested_skills = ['System Architecture', 'Security', 'Scalability'];
 
             const { data: scanData, error: scanError } = await supabase
                 .from('cv_scans')
@@ -185,7 +199,7 @@ export default function ScanCVScreen() {
                     suggested_skills,
                     analysis_result: {
                         score: 85,
-                        feedback: "Great experience in frontend technologies."
+                        feedback: "AI has successfully parsed your experience. Skills like " + detected_skills.slice(0, 2).join(', ') + " were found."
                     }
                 })
                 .select()

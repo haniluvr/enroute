@@ -1,5 +1,5 @@
 import tw from '@/lib/tailwind';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Animated, Modal, Platform, PanResponder, Dimensions, Share, KeyboardAvoidingView, Alert, Pressable } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Animated, Modal, Platform, PanResponder, Dimensions, Share, KeyboardAvoidingView, Alert, Pressable, ActivityIndicator } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import {
@@ -35,7 +35,10 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
+import { AI_API } from '@/config/backend';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { PERSONAS, Persona, MOCK_INSIGHTS, MOCK_QUOTES, MOCK_TRANSCRIPTION } from '@/data/dahliaData';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
@@ -86,6 +89,95 @@ export default function DahliaScreen() {
 
     // Pulsing animation for voice mode
     const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    // Voice Recording States
+    const [voiceRecording, setVoiceRecording] = useState<Audio.Recording | null>(null);
+    const [isVoiceProcessing, setIsVoiceProcessing] = useState(false);
+    const [permissionResponse, requestPermission] = Audio.usePermissions();
+
+    /**
+     * Start recording user's voice
+     */
+    async function startVoiceRecording() {
+        try {
+            if (permissionResponse?.status !== 'granted') {
+                await requestPermission();
+            }
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: true,
+                playsInSilentModeIOS: true,
+            });
+
+            const { recording } = await Audio.Recording.createAsync(
+                Audio.RecordingOptionsPresets.HIGH_QUALITY
+            );
+            setVoiceRecording(recording);
+            console.log('Voice recording started');
+        } catch (err) {
+            console.error('Failed to start voice recording', err);
+        }
+    }
+
+    /**
+     * Stop voice recording and process it
+     */
+    async function stopVoiceRecording() {
+        if (!voiceRecording) return;
+        
+        setIsVoiceProcessing(true);
+        setVoiceRecording(null);
+        await voiceRecording.stopAndUnloadAsync();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+        
+        const uri = voiceRecording.getURI();
+        if (uri) {
+            await processVoiceTranscription(uri);
+        } else {
+            setIsVoiceProcessing(false);
+        }
+    }
+
+    /**
+     * Send voice to backend and then to AI chat
+     */
+    async function processVoiceTranscription(uri: string) {
+        try {
+            const formData = new FormData();
+            // @ts-ignore
+            formData.append('audio', {
+                uri,
+                type: 'audio/m4a',
+                name: 'dahlia_call.m4a',
+            });
+
+            const response = await fetch(AI_API.STT, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (data.transcription) {
+                // Send transcribed text to chat
+                await handleSendMessageFromVoice(data.transcription);
+            }
+        } catch (err) {
+            console.error('Voice processing error:', err);
+        } finally {
+            setIsVoiceProcessing(false);
+        }
+    }
+
+    /**
+     * Wrapper for handleSendMessage to use transcribed text
+     */
+    async function handleSendMessageFromVoice(text: string) {
+        // We'll adapt the existing send message logic
+        setInputText(text);
+        // Call existing send message
+        setTimeout(() => {
+            handleSendMessage();
+        }, 100);
+    }
 
     const formatDurationLabel = (seconds: number) => {
         if (seconds >= 3600) {
@@ -445,16 +537,21 @@ export default function DahliaScreen() {
     ).current;
 
     const startConversation = async (persona: Persona) => {
-        if (!user || user.id === 'pending' || conversationId) return;
+        if (!user || conversationId) return;
         try {
+            const insertData: any = {
+                persona_name: persona.name,
+                persona_type: persona.type,
+                status: 'active',
+            };
+
+            if (user.id !== 'pending') {
+                insertData.user_id = user.id;
+            }
+
             const { data, error } = await supabase
                 .from('conversations')
-                .insert({
-                    user_id: user.id,
-                    persona_name: persona.name,
-                    persona_type: persona.type,
-                    status: 'active',
-                })
+                .insert(insertData)
                 .select()
                 .single();
             
@@ -505,7 +602,7 @@ export default function DahliaScreen() {
     }, [existingConvId, fetchMessages, fetchNotes]);
 
     const handleSendMessage = async () => {
-        if (!inputText.trim() || !user || user.id === 'pending') return;
+        if (!inputText.trim() || !user) return;
         
         let currentConvId = conversationId;
         if (!currentConvId) {
@@ -527,31 +624,64 @@ export default function DahliaScreen() {
         setChatMessages(prev => [...prev, newUserMsg]);
 
         try {
-            const { error } = await supabase.from('conversation_messages').insert(newUserMsg);
-            if (error) throw error;
+            const { error: insertError } = await supabase.from('conversation_messages').insert(newUserMsg);
+            if (insertError) throw insertError;
 
-            // Simulate AI response
-            setTimeout(async () => {
+            // Call Backend AI
+            const response = await fetch(AI_API.CHAT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    persona: selectedPersona.name,
+                    history: chatMessages.map(m => ({
+                        role: m.speaker === 'user' ? 'user' : 'assistant',
+                        content: m.message_text
+                    })).concat([{ role: 'user', content: text }])
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.response) {
                 const aiResponse = {
                     conversation_id: currentConvId,
                     speaker: 'ai' as const,
-                    message_text: `I understand you're interested in ${text}. Let's explore that further.`,
+                    message_text: data.response,
                     created_at: new Date().toISOString()
                 };
                 setChatMessages(prev => [...prev, aiResponse]);
                 await supabase.from('conversation_messages').insert(aiResponse);
-            }, 1000);
+
+                // Voice Response if in voice mode
+                if (callMode === 'voice') {
+                    Speech.speak(data.response, {
+                        pitch: 1.0,
+                        rate: 1.0,
+                    });
+                }
+            }
 
         } catch (err) {
-            console.error('Save Message Error:', err);
+            console.error('AI Send Message Error:', err);
+            // Fallback for demo if backend is down
+            setTimeout(async () => {
+                const aiResponse = {
+                    conversation_id: currentConvId,
+                    speaker: 'ai' as const,
+                    message_text: `I understand you're interested in ${text}. Let's explore that further. (Demo Mode)`,
+                    created_at: new Date().toISOString()
+                };
+                setChatMessages(prev => [...prev, aiResponse]);
+            }, 1000);
         }
     };
 
     const uploadToSupabase = async (uri: string, name: string, type: string) => {
-        if (!user || user.id === 'pending' || !conversationId) return;
+        if (!user || !conversationId) return;
         try {
             const response = await fetch(uri);
             const blob = await response.blob();
+            // Use 'pending' or user id for the path
             const filePath = `${user.id}/${conversationId}/${Date.now()}_${name}`;
 
             const { data, error } = await supabase.storage
@@ -927,9 +1057,18 @@ export default function DahliaScreen() {
             {/* Bottom Nav */}
             <View style={tw`px-6 pb-10 items-center`}>
                 <View style={tw`flex-row items-center bg-white/10 rounded-full border border-white/15 p-1.5 self-center`}>
-                    <TouchableOpacity style={tw`flex-row items-center bg-white/5 pl-5 pr-4 py-3.5 rounded-full border border-white/10`}>
-                        <Mic color="#fff" size={20} style={tw`mr-2.5`} />
-                        <Text style={tw`text-white font-[InterTight] font-semibold text-base pr-2`}>Tap to speak</Text>
+                    <TouchableOpacity 
+                        onPress={voiceRecording ? stopVoiceRecording : startVoiceRecording}
+                        style={tw`flex-row items-center ${voiceRecording ? 'bg-red-500/20 border-red-500/50' : 'bg-white/5 border-white/10'} pl-5 pr-4 py-3.5 rounded-full border`}
+                    >
+                        {isVoiceProcessing ? (
+                            <ActivityIndicator size="small" color="#fff" style={tw`mr-2.5`} />
+                        ) : (
+                            <Mic color={voiceRecording ? "#ff4444" : "#fff"} size={20} style={tw`mr-2.5`} />
+                        )}
+                        <Text style={tw`text-white font-[InterTight] font-semibold text-base pr-2`}>
+                            {isVoiceProcessing ? 'Processing...' : voiceRecording ? 'Recording...' : 'Tap to speak'}
+                        </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity

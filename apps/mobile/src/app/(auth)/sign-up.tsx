@@ -344,8 +344,16 @@ export default function SignUpScreen() {
             career_interest: careerInterest,
             current_level: currentLevel
         };
-        // Set local state for immediate "Hi Name"
-        await signIn(email, metadata);
+        
+        // Use the user object from signup response if available
+        if (signedUpUser) {
+            await signIn(signedUpUser, metadata);
+        } else {
+            // Fallback: check if session was automatically created
+            const { data: { user } } = await supabase.auth.getUser();
+            await signIn(user || email, metadata);
+        }
+
         // Persist to DB
         await syncProfile(metadata);
         router.replace('/(tabs)/home');
@@ -356,6 +364,8 @@ export default function SignUpScreen() {
         if (personaError) setPersonaError('');
         // TODO: Play voice preview for selected persona
     };
+
+    const [signedUpUser, setSignedUpUser] = useState<any>(null);
 
     const handleFinish = async () => {
         if (!validateStep3()) return;
@@ -384,6 +394,9 @@ export default function SignUpScreen() {
                 throw error;
             }
 
+            if (data.user) {
+                setSignedUpUser(data.user);
+            }
             setShowSuccessModal(true);
         } catch (error) {
             console.error('Signup error:', error);

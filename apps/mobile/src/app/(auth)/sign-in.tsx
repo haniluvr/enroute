@@ -80,6 +80,8 @@ export default function SignInScreen() {
         return isValid;
     };
 
+    const [loggedInUser, setLoggedInUser] = useState<any>(null);
+
     const handleLogin = async () => {
         if (!validate()) return;
 
@@ -116,14 +118,13 @@ export default function SignInScreen() {
                 throw error;
             }
 
-            const metadata = data.user?.user_metadata || {};
-            setUserMetadata(metadata);
-
-            const first = metadata.first_name || '';
-            const nick = metadata.nickname || '';
-
-            setDisplayName(nick || first || 'User');
-            setShowSuccessModal(true);
+            if (data.user) {
+                setLoggedInUser(data.user);
+                const metadata = data.user.user_metadata || {};
+                setUserMetadata(metadata);
+                setDisplayName(metadata.nickname || metadata.first_name || 'User');
+                setShowSuccessModal(true);
+            }
         } catch (error) {
             console.error('Login error:', error);
         } finally {
@@ -133,7 +134,13 @@ export default function SignInScreen() {
 
     const handleModalClose = async () => {
         setShowSuccessModal(false);
-        await signIn(email, userMetadata);
+        if (loggedInUser) {
+            await signIn(loggedInUser, userMetadata);
+        } else {
+            // Fallback for email-verified check or similar
+            const { data: { user } } = await supabase.auth.getUser();
+            await signIn(user || email, userMetadata);
+        }
         router.replace('/(tabs)/home');
     };
 

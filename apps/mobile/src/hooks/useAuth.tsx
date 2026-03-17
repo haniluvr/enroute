@@ -7,7 +7,7 @@ interface AuthContextType {
     user: User | null;
     isLoading: boolean;
     isCounselor: boolean;
-    signIn: (email: string, metadata?: any) => Promise<void>;
+    signIn: (emailOrUser: string | User, metadata?: any) => Promise<void>;
     signOut: () => Promise<void>;
     refreshUser: () => Promise<void>;
     syncProfile: (details: any) => Promise<void>;
@@ -56,18 +56,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            console.log(`[useAuth] Auth Event: ${_event}`, {
+                sessionId: session?.user?.id,
+                event: _event,
+                hasUser: !!session?.user
+            });
+            
             if (session?.user) {
+                console.log(`[useAuth] Setting user to ${session.user.id}`);
                 setUser(session.user);
                 setIsCounselor(session.user.user_metadata?.role === 'counselor');
                 setIsLoading(false);
             } else if (_event === 'SIGNED_OUT') {
+                console.log('[useAuth] User signed out');
                 setUser(null);
                 setIsCounselor(false);
                 setIsLoading(false);
-            } else if (!user || user.id !== 'pending') {
-                // Keep the pending user if we manually set it
-                setUser(null);
-                setIsCounselor(false);
+            } else if (_event === 'INITIAL_SESSION') {
+                console.log('[useAuth] Initial session check complete.');
+                if (session?.user) {
+                    setUser(session.user);
+                    setIsLoading(false);
+                } else {
+                    // Only clear if we aren't already in a pending state
+                    setUser(prev => {
+                        if (prev && prev.id === 'pending') return prev;
+                        return null;
+                    });
+                    setIsLoading(false);
+                }
+            } else {
+                console.log(`[useAuth] Session is null for event ${_event}.`);
+                // For other events where session is null, only clear if we aren't in 'pending' state
+                setUser(prev => {
+                    if (prev && prev.id === 'pending') {
+                        console.log('[useAuth] Retaining pending user state');
+                        return prev;
+                    }
+                    console.log('[useAuth] Clearing user state');
+                    return null;
+                });
                 setIsLoading(false);
             }
         });
@@ -104,8 +132,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const signIn = async (email: string, metadata?: any) => {
-        // Strong manual update for initial landing
+    const signIn = async (emailOrUser: string | User, metadata?: any) => {
+        if (typeof emailOrUser !== 'string') {
+            console.log('SignIn called with User object:', emailOrUser.id);
+            setUser(emailOrUser);
+            setIsLoading(false);
+            if (emailOrUser.user_metadata?.role === 'counselor' || metadata?.role === 'counselor') {
+                setIsCounselor(true);
+            }
+            return;
+        }
+
+        const email = emailOrUser;
+        // Check if we already have a real session from Supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+        
+        const realUser = session?.user || supabaseUser;
+
+        if (realUser) {
+            setUser(realUser);
+            setIsLoading(false);
+            if (realUser.user_metadata?.role === 'counselor' || metadata?.role === 'counselor') {
+                setIsCounselor(true);
+            }
+            return;
+        }
+
+        // Strong manual update for initial landing (e.g. before email verify)
+        // Try to keep the email as part of the identification
         setUser({
             id: 'pending',
             email,
