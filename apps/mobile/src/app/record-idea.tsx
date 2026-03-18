@@ -59,6 +59,42 @@ import { useAuth } from '@/hooks/useAuth';
 
 const { width, height } = Dimensions.get('window');
 
+const VisualizerBar = ({ index, metering, isPaused, totalBars }: { index: number; metering: any; isPaused: boolean, totalBars: number }) => {
+    const animatedBarStyle = useAnimatedStyle(() => {
+        const normalizedMetering = Math.max(-60, Math.min(0, metering.value || -60));
+        const level = (normalizedMetering + 60) / 60;
+        
+        // Phase shift: we want the bars to react with a delay based on their index
+        // to create a "trailing" or "traveling" wave effect.
+        // We use Math.sin with an index offset to make it look more organic.
+        const phaseOffset = index * 0.2;
+        const sinFactor = Math.abs(Math.sin(phaseOffset)) * 0.4 + 0.6;
+        
+        // Base height when silent vs max height
+        // We also want bars at the edges (left/right) to be smaller to taper the wave
+        const edgeTaper = Math.sin((index / totalBars) * Math.PI);
+        const targetHeight = 4 + (level * 100 * sinFactor * edgeTaper);
+        
+        return {
+            height: withSpring(targetHeight, { damping: 15, stiffness: 120 }),
+            opacity: withTiming(isPaused ? 0.2 : 0.8),
+        };
+    });
+
+    const bgColors = ['#22d3ee', '#ec4899', '#8b5cf6'];
+    const barColor = bgColors[index % 3];
+
+    return (
+        <Animated.View
+            style={[
+                tw`w-[3px] mx-[1px] rounded-full`,
+                { backgroundColor: barColor },
+                animatedBarStyle
+            ]}
+        />
+    );
+};
+
 type Message = {
     role: 'user' | 'assistant';
     content: string;
@@ -71,6 +107,9 @@ export default function RecordIdeaScreen() {
     const { user } = useAuth();
     const router = useRouter();
     const [state, setState] = useState<FlowState>('IDLE');
+    const [isPaused, setIsPaused] = useState(false);
+    const [processingProgress, setProcessingProgress] = useState(0);
+    const isCancelledRef = useRef(false);
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -83,6 +122,7 @@ export default function RecordIdeaScreen() {
     // Pulse animation for recording
     const pulse = useSharedValue(1);
     const micScale = useSharedValue(1);
+    const metering = useSharedValue(-160);
 
     useEffect(() => {
         console.log('RecordIdeaScreen Auth State Change:', {
@@ -93,7 +133,7 @@ export default function RecordIdeaScreen() {
     }, [user]);
 
     useEffect(() => {
-        if (state === 'RECORDING') {
+        if (state === 'RECORDING' && !isPaused) {
             pulse.value = withRepeat(
                 withTiming(1.6, { duration: 1200 }),
                 -1,
@@ -107,8 +147,21 @@ export default function RecordIdeaScreen() {
                 clearInterval(interval);
                 pulse.value = 1;
             };
+        } else if (state === 'RECORDING' && isPaused) {
+            pulse.value = withTiming(1);
         }
-    }, [state]);
+        
+        if (state === 'PROCESSING') {
+            setProcessingProgress(0);
+            const interval = setInterval(() => {
+                setProcessingProgress(prev => {
+                    if (prev >= 98) return prev;
+                    return prev + Math.floor(Math.random() * 5) + 1;
+                });
+            }, 300);
+            return () => clearInterval(interval);
+        }
+    }, [state, isPaused]);
 
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
     const [audioUri, setAudioUri] = useState<string | null>(null);
@@ -186,14 +239,42 @@ export default function RecordIdeaScreen() {
             const { recording } = await Audio.Recording.createAsync( 
                 Audio.RecordingOptionsPresets.HIGH_QUALITY 
             );
+            
+            recording.setOnRecordingStatusUpdate((status) => {
+                if (status.isRecording && status.metering !== undefined) {
+                    metering.value = withTiming(status.metering, { duration: 100 });
+                }
+            });
+            await recording.setProgressUpdateInterval(100);
+
             setRecording(recording);
             setSeconds(0);
+            setIsPaused(false);
             setState('RECORDING');
             console.log('Recording started');
         } catch (err) {
             console.error('Failed to start recording', err);
             Alert.alert("Error", "Could not start recording.");
         }
+    }
+
+    async function pauseRecording() {
+        if (recording) {
+            await recording.pauseAsync();
+            setIsPaused(true);
+        }
+    }
+
+    async function resumeRecording() {
+        if (recording) {
+            await recording.startAsync();
+            setIsPaused(false);
+        }
+    }
+
+    async function cancelProcessing() {
+        isCancelledRef.current = true;
+        setState('IDLE');
     }
 
     /**
@@ -204,6 +285,7 @@ export default function RecordIdeaScreen() {
         if (!recording) return;
 
         setState('PROCESSING');
+        isCancelledRef.current = false;
         setRecording(null);
         await recording.stopAndUnloadAsync();
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
@@ -235,10 +317,15 @@ export default function RecordIdeaScreen() {
                 body: formData,
             });
 
+            if (isCancelledRef.current) return;
+
             const data = await response.json();
             if (data.transcription) {
                 setTranscription(data.transcription);
                 const result = await startIdeaConversation();
+                
+                if (isCancelledRef.current) return;
+                
                 setState('REFINE'); // Switch UI immediately
                 
                 // If result is a valid UUID
@@ -253,6 +340,7 @@ export default function RecordIdeaScreen() {
                 throw new Error('Transcription failed');
             }
         } catch (err) {
+            if (isCancelledRef.current) return;
             console.error('Transcription Error:', err);
             Alert.alert("Error", "Failed to transcribe your thoughts. Please try again.");
             setState('IDLE');
@@ -321,12 +409,23 @@ export default function RecordIdeaScreen() {
     }));
 
     const formatTime = (totalSeconds: number) => {
-        const mins = Math.floor(totalSeconds / 60);
+        const hrs = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
         const secs = totalSeconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const handleRestart = () => {
+    const handleRestart = async () => {
+        if (state === 'RECORDING') {
+            if (recording) {
+                await recording.stopAndUnloadAsync();
+                setRecording(null);
+            }
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+            startRecording();
+            return;
+        }
+
         if (state === 'REFINE') {
             Alert.alert(
                 "Restart Recording",
@@ -498,36 +597,58 @@ export default function RecordIdeaScreen() {
         }
     };
 
-    const renderHeader = () => (
-        <View style={tw`px-6 pt-16 pb-4 flex-row items-center justify-between`}>
-            <TouchableOpacity
-                onPress={() => state === 'IDLE' ? router.back() : setState('IDLE')}
-                style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
-                activeOpacity={0.7}
-            >
-                <ChevronLeft color="#fff" size={24} />
-            </TouchableOpacity>
+    const renderHeader = () => {
+        if (state === 'REFINE') {
+            return (
+                <View style={tw`px-6 pt-16 pb-4 flex-row items-center justify-between`}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
+                        activeOpacity={0.7}
+                    >
+                        <ChevronLeft color="#fff" size={24} />
+                    </TouchableOpacity>
 
-            <View style={tw`items-center`}>
-                <Text style={tw`text-white font-[InterTight-Bold] text-lg`}>
-                    {state === 'IDLE' ? "Record Idea" :
-                        state === 'RECORDING' ? "Recording" :
-                            state === 'PROCESSING' ? "Analyzing" : "Refine Idea"}
-                </Text>
-                {state === 'RECORDING' && (
-                    <Text style={tw`text-accent-violet font-[InterTight-Medium] text-xs`}>{formatTime(seconds)}</Text>
-                )}
+                    <View style={tw`items-center`}>
+                        <Text style={tw`text-white font-[InterTight-Bold] text-lg`}>Refine Idea</Text>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={handleRestart}
+                        style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
+                        activeOpacity={0.7}
+                    >
+                        <RotateCcw color="#fff" size={20} />
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
+        return (
+            <View style={tw`px-6 pt-16 pb-4 flex-row items-center justify-between`}>
+                <TouchableOpacity
+                    onPress={() => {
+                        if (state === 'PROCESSING') cancelProcessing();
+                        else if (state === 'RECORDING') {
+                            if (recording) recording.stopAndUnloadAsync();
+                            setState('IDLE');
+                        } else router.back();
+                    }}
+                    style={tw`w-11 h-11 rounded-full border border-white/20 bg-white/5 items-center justify-center`}
+                >
+                    <ChevronLeft color="#fff" size={24} />
+                </TouchableOpacity>
+
+                <View style={tw`items-center`}>
+                    {state === 'PROCESSING' && (
+                        <Text style={tw`text-gray-400 font-[InterTight-Medium] text-[15px]`}>Processing...</Text>
+                    )}
+                </View>
+
+                <View style={tw`w-11`} />
             </View>
-
-            <TouchableOpacity
-                onPress={handleRestart}
-                style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
-                activeOpacity={0.7}
-            >
-                <RotateCcw color="#fff" size={20} />
-            </TouchableOpacity>
-        </View>
-    );
+        );
+    };
 
     return (
         <KeyboardAvoidingView
@@ -538,51 +659,156 @@ export default function RecordIdeaScreen() {
                 {renderHeader()}
 
                 {state !== 'REFINE' ? (
-                    <View style={tw`flex-1 px-6 justify-center items-center`}>
-                        {/* Recording Visualization Area */}
-                        <View style={tw`w-full h-80 items-center justify-center`}>
-                            {state === 'IDLE' && (
-                                <Animated.View entering={FadeIn.duration(800)} style={tw`items-center`}>
-                                    <TouchableOpacity
-                                        onPress={startRecording}
-                                        activeOpacity={0.8}
-                                        onPressIn={() => micScale.value = withSpring(0.9)}
-                                        onPressOut={() => micScale.value = withSpring(1)}
-                                        style={tw`w-28 h-28 rounded-full bg-white/10 border border-white/20 items-center justify-center shadow-2xl`}
-                                    >
-                                        <View style={tw`w-20 h-20 rounded-full bg-accent-violet items-center justify-center`}>
-                                            <Mic color="#fff" size={38} />
-                                        </View>
-                                    </TouchableOpacity>
-                                    <Text style={tw`text-white font-[InterTight-SemiBold] text-2xl mt-8 mb-2`}>Tap to start</Text>
-                                    <Text style={tw`text-gray-400 font-[InterTight] text-[15px] text-center px-8`}>
-                                        Speak naturally about your goals, questions, or random career sparks.
+                    <View style={tw`flex-1`}>
+                        {state === 'IDLE' && (
+                            <Animated.View entering={FadeIn} exiting={FadeOut} style={tw`flex-1 items-center justify-between px-6 pb-12 pt-8`}>
+                                <View style={tw`items-center mt-4`}>
+                                    <Text style={tw`text-white font-[InterTight-Medium] text-[22px]`}>
+                                        Ready to capture your voice?
                                     </Text>
-                                </Animated.View>
-                            )}
- 
-                            {state === 'RECORDING' && (
-                                <View style={tw`items-center justify-center`}>
-                                    <Animated.View style={[tw`absolute w-48 h-48 rounded-full bg-accent-violet/20`, animatedPulseStyle]} />
-                                    <Animated.View style={[tw`absolute w-64 h-64 rounded-full bg-accent-violet/10`, animatedPulseStyle]} />
-                                    <TouchableOpacity
-                                        onPress={stopRecording}
-                                        style={tw`w-28 h-28 rounded-full bg-white items-center justify-center z-10 shadow-xl shadow-accent-violet/50`}
-                                    >
-                                        <Square color="#8b5cf6" size={32} fill="#8b5cf6" />
-                                    </TouchableOpacity>
-                                    <Text style={tw`text-white font-[InterTight-Medium] text-[17px] mt-12 opacity-60`}>Listening to your thoughts...</Text>
                                 </View>
-                            )}
+                                
+                                <View style={tw`flex-1 items-center justify-center w-full`}>
+                                    <View style={tw`w-64 h-64 rounded-full bg-accent-violet/10 border border-white/5 items-center justify-center`}>
+                                        <View style={tw`w-48 h-48 rounded-full bg-accent-violet/20 blur-xl absolute`} />
+                                        <View style={tw`w-32 h-32 rounded-full bg-[#22d3ee]/20 blur-2xl absolute -top-4 -left-4`} />
+                                        <View style={tw`w-32 h-32 rounded-full bg-[#ec4899]/20 blur-2xl absolute -bottom-4 -right-4`} />
+                                    </View>
+                                </View>
 
-                            {state === 'PROCESSING' && (
-                                <Animated.View entering={FadeIn} style={tw`items-center`}>
-                                    <ActivityIndicator color="#8b5cf6" size="large" />
-                                    <Text style={tw`text-white font-[InterTight-Medium] text-xl mt-8`}>Dahlia is thinking...</Text>
-                                    <Text style={tw`text-gray-400 font-[InterTight] mt-2`}>Synthesizing your career insights</Text>
-                                </Animated.View>
-                            )}
-                        </View>
+                                <View style={tw`items-center flex-row justify-center w-full relative mb-8`}>
+                                    <TouchableOpacity style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute left-0`}>
+                                        <Play color="#fff" size={20} opacity={0.5} />
+                                    </TouchableOpacity>
+                                    
+                                    <View style={tw`items-center justify-center`}>
+                                        <TouchableOpacity
+                                            onPress={startRecording}
+                                            activeOpacity={0.8}
+                                            onPressIn={() => micScale.value = withSpring(0.9)}
+                                            onPressOut={() => micScale.value = withSpring(1)}
+                                            style={tw`w-24 h-24 rounded-full bg-white/10 border border-white/20 items-center justify-center shadow-2xl overflow-hidden`}
+                                        >
+                                            <View style={tw`absolute inset-0 bg-accent-violet/50 opacity-50 blur-xl`} />
+                                            <View style={tw`w-16 h-16 rounded-full bg-[#9b6dff] items-center justify-center shadow-lg`}>
+                                                <Mic color="#fff" size={32} />
+                                            </View>
+                                        </TouchableOpacity>
+                                        <Text style={tw`text-white/70 font-[InterTight-Medium] text-[15px] mt-4`}>Record Now</Text>
+                                    </View>
+                                    
+                                    <TouchableOpacity style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute right-0`}>
+                                        <RotateCcw color="#fff" size={20} opacity={0.5} />
+                                    </TouchableOpacity>
+                                </View>
+                            </Animated.View>
+                        )}
+
+                        {state === 'RECORDING' && (
+                            <Animated.View entering={FadeIn} exiting={FadeOut} style={tw`flex-1 items-center justify-between pb-12 pt-8`}>
+                                <View style={tw`items-center mt-4 px-6`}>
+                                    <Text style={tw`text-white font-[InterTight-Medium] text-[22px] px-8 text-center`}>
+                                        Record, process, and manage your audio with a single tap
+                                    </Text>
+                                </View>
+                                
+                                <View style={tw`flex-1 items-center justify-center w-full`}>
+                                    <View style={tw`w-full h-40 flex-row items-center justify-center overflow-hidden`}>
+                                        {Array.from({ length: 60 }).map((_, i) => (
+                                            <VisualizerBar 
+                                                key={i} 
+                                                index={i} 
+                                                totalBars={60}
+                                                metering={metering} 
+                                                isPaused={isPaused} 
+                                            />
+                                        ))}
+                                    </View>
+                                    
+                                    <Text style={tw`text-[#b895ff] font-[InterTight-Light] text-4xl mt-12 tracking-wider`}>
+                                        {formatTime(seconds)}
+                                    </Text>
+                                </View>
+
+                                <View style={tw`items-center flex-row justify-center w-full relative mb-8 px-6`}>
+                                    <TouchableOpacity 
+                                        onPress={isPaused ? resumeRecording : pauseRecording}
+                                        style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute left-6`}
+                                    >
+                                        {isPaused ? <Play color="#fff" size={20} /> : <Pause color="#fff" size={20} />}
+                                    </TouchableOpacity>
+                                    
+                                    <View style={tw`items-center justify-center`}>
+                                        <TouchableOpacity
+                                            onPress={stopRecording}
+                                            activeOpacity={0.8}
+                                            style={tw`w-24 h-24 rounded-full bg-white/10 border border-white/20 items-center justify-center shadow-2xl overflow-hidden`}
+                                        >
+                                            <View style={tw`absolute inset-0 bg-accent-violet/50 opacity-50 blur-xl`} />
+                                            <View style={tw`w-16 h-16 rounded-full bg-[#9b6dff] items-center justify-center shadow-lg`}>
+                                                <Mic color="#fff" size={32} />
+                                            </View>
+                                        </TouchableOpacity>
+                                        <Text style={tw`text-white/70 font-[InterTight-Medium] text-[15px] mt-4`}>Stop Recording</Text>
+                                    </View>
+                                    
+                                    <TouchableOpacity 
+                                        onPress={handleRestart}
+                                        style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute right-6`}
+                                    >
+                                        <RotateCcw color="#fff" size={20} />
+                                    </TouchableOpacity>
+                                </View>
+                            </Animated.View>
+                        )}
+
+                        {state === 'PROCESSING' && (
+                            <Animated.View entering={FadeIn} style={tw`flex-1 items-center justify-between px-6 pb-12 pt-8`}>
+                                <View style={tw`items-center mt-4 w-full px-4`}>
+                                    <Text style={tw`text-white font-[InterTight-Medium] text-[26px] text-center leading-[32px]`}>
+                                        We're carefully processing your audio, this will only take a moment.
+                                    </Text>
+                                </View>
+                                
+                                <View style={tw`flex-1 items-center justify-center w-full`}>
+                                    <View style={tw`w-64 h-64 items-center justify-center rounded-full border-[2px] border-[#9b6dff]/30 shadow-2xl shadow-purple-500/40 relative overflow-hidden bg-[#2D065C]`}>
+                                        {/* Gradients to look like liquid chrome/glass */}
+                                        <View style={tw`w-full h-full absolute top-0 left-0 bg-[#9b6dff]/40 opacity-50 blur-2xl`} />
+                                        <View style={tw`absolute inset-0 rounded-full bg-[#8b5cf6]/20 blur-xl`} />
+                                        <View style={tw`absolute top-2 left-6 w-16 h-8 rounded-full bg-white/20 rotate-[-30deg] blur-md`} />
+                                        <View style={tw`absolute bottom-4 right-4 w-24 h-24 rounded-full bg-[#ec4899]/30 blur-2xl`} />
+                                        <View style={tw`absolute top-1/2 left-1/2 -ml-12 -mt-12 w-24 h-24 rounded-full bg-[#22d3ee]/20 blur-2xl`} />
+                                        
+                                        <Text style={tw`text-white font-[InterTight-Light] text-6xl shadow-md tracking-wider`}>
+                                            {processingProgress}%
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={tw`items-center flex-row justify-center w-full relative mb-8`}>
+                                    <View style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute left-0`}>
+                                        <Play color="#fff" size={20} opacity={0.2} />
+                                    </View>
+                                    
+                                    <View style={tw`items-center justify-center`}>
+                                        <TouchableOpacity
+                                            onPress={cancelProcessing}
+                                            activeOpacity={0.8}
+                                            style={tw`w-20 h-20 rounded-full bg-red-500/20 border border-red-500/50 items-center justify-center shadow-2xl shadow-red-500/20`}
+                                        >
+                                            <View style={tw`w-14 h-14 rounded-full bg-[#ff4a4a] items-center justify-center shadow-lg`}>
+                                                <CloseIcon color="#fff" size={24} />
+                                            </View>
+                                        </TouchableOpacity>
+                                        <Text style={tw`text-white/70 font-[InterTight-Medium] text-[15px] mt-4`}>Cancel Process</Text>
+                                    </View>
+                                    
+                                    <View style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute right-0`}>
+                                        <Play color="#fff" size={20} opacity={0.2} />
+                                    </View>
+                                </View>
+                            </Animated.View>
+                        )}
                     </View>
                 ) : (
                     <View style={tw`flex-1`}>
