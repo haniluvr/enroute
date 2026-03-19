@@ -15,9 +15,14 @@ import {
     Modal,
     Pressable
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import { useRouter } from 'expo-router';
+const AIAudioWebP = require('@/assets/ai-audio.webp');
+// @ts-ignore
+import LogoSVG from '@/assets/logo.svg';
 import {
     ChevronLeft,
     Mic,
@@ -45,6 +50,7 @@ import { AI_API } from '@/config/backend';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
+    useAnimatedProps,
     withRepeat,
     withTiming,
     withSpring,
@@ -59,39 +65,124 @@ import { useAuth } from '@/hooks/useAuth';
 
 const { width, height } = Dimensions.get('window');
 
-const VisualizerBar = ({ index, metering, isPaused, totalBars }: { index: number; metering: any; isPaused: boolean, totalBars: number }) => {
-    const animatedBarStyle = useAnimatedStyle(() => {
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+const WaveformVisualizer = ({ metering, isPaused }: { metering: any; isPaused: boolean }) => {
+    const points = 50; // Number of points in the line
+    const width = Dimensions.get('window').width;
+    const height = 150;
+    
+    // We use a single Ref to draw the path
+    const animatedProps = useAnimatedProps(() => {
         const normalizedMetering = Math.max(-60, Math.min(0, metering.value || -60));
         const level = (normalizedMetering + 60) / 60;
+        const amplitude = isPaused ? 2 : 5 + level * 50;
         
-        // Phase shift: we want the bars to react with a delay based on their index
-        // to create a "trailing" or "traveling" wave effect.
-        // We use Math.sin with an index offset to make it look more organic.
-        const phaseOffset = index * 0.2;
-        const sinFactor = Math.abs(Math.sin(phaseOffset)) * 0.4 + 0.6;
+        let d = `M 0 ${height / 2}`;
         
-        // Base height when silent vs max height
-        // We also want bars at the edges (left/right) to be smaller to taper the wave
-        const edgeTaper = Math.sin((index / totalBars) * Math.PI);
-        const targetHeight = 4 + (level * 100 * sinFactor * edgeTaper);
+        for (let i = 0; i <= points; i++) {
+            const x = (i / points) * width;
+            // Create an organic wave using multiple sine waves combined with metering
+            const time = Date.now() / 200;
+            const wave1 = Math.sin(i * 0.2 + time) * amplitude;
+            const wave2 = Math.sin(i * 0.5 - time * 1.5) * (amplitude * 0.3);
+            
+            // Taper the edges so it stays connected at the ends
+            const taper = Math.sin((i / points) * Math.PI);
+            const y = height / 2 + (wave1 + wave2) * taper;
+            
+            d += ` L ${x} ${y}`;
+        }
         
         return {
-            height: withSpring(targetHeight, { damping: 15, stiffness: 120 }),
-            opacity: withTiming(isPaused ? 0.2 : 0.8),
+            d,
+            opacity: withTiming(isPaused ? 0.3 : 1),
         };
     });
 
-    const bgColors = ['#22d3ee', '#ec4899', '#8b5cf6'];
-    const barColor = bgColors[index % 3];
+    return (
+        <View style={tw`w-full items-center justify-center h-40`}>
+            <Svg width={width} height={height}>
+
+                <AnimatedPath
+                    animatedProps={animatedProps}
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.8)"
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                />
+            </Svg>
+        </View>
+    );
+};
+
+const AIAudioVisualizer = ({ metering }: { metering: any }) => {
+    const rotation1 = useSharedValue(0);
+    const rotation2 = useSharedValue(0);
+
+    useEffect(() => {
+        rotation1.value = withRepeat(
+            withTiming(360, { duration: 25000 }),
+            -1,
+            false
+        );
+        rotation2.value = withRepeat(
+            withTiming(-360, { duration: 35000 }),
+            -1,
+            false
+        );
+    }, []);
+
+    const animatedStyle1 = useAnimatedStyle(() => {
+        const normalizedMetering = Math.max(-60, Math.min(0, metering.value || -60));
+        const level = (normalizedMetering + 60) / 60;
+        const scale = 1.1 + (level * 0.3);
+        
+        return {
+            transform: [
+                { rotate: `${rotation1.value}deg` },
+                { scale }
+            ],
+            opacity: 0.6,
+        };
+    });
+
+    const animatedStyle2 = useAnimatedStyle(() => {
+        const normalizedMetering = Math.max(-60, Math.min(0, metering.value || -60));
+        const level = (normalizedMetering + 60) / 60;
+        const scale = 1.0 + (level * 0.5);
+        
+        return {
+            transform: [
+                { rotate: `${rotation2.value}deg` },
+                { scale }
+            ],
+            opacity: 0.4,
+        };
+    });
 
     return (
-        <Animated.View
-            style={[
-                tw`w-[3px] mx-[1px] rounded-full`,
-                { backgroundColor: barColor },
-                animatedBarStyle
-            ]}
-        />
+        <View style={tw`w-full h-full items-center justify-center`}>
+            {/* Glow / Bloom background */}
+            <View style={tw`absolute w-52 h-52 rounded-full bg-cyan-400/10 blur-3xl`} />
+            <View style={tw`absolute w-42 h-42 rounded-full bg-purple-600/10 blur-2xl`} />
+            
+            <Animated.View style={[tw`absolute w-80 h-80`, animatedStyle1]}>
+                <Animated.Image 
+                    source={AIAudioWebP} 
+                    style={tw`w-full h-full`} 
+                    resizeMode="contain"
+                />
+            </Animated.View>
+            
+            <Animated.View style={[tw`absolute w-84 h-84`, animatedStyle2]}>
+                <Animated.Image 
+                    source={AIAudioWebP} 
+                    style={tw`w-full h-full`} 
+                    resizeMode="contain"
+                />
+            </Animated.View>
+        </View>
     );
 };
 
@@ -150,7 +241,7 @@ export default function RecordIdeaScreen() {
         } else if (state === 'RECORDING' && isPaused) {
             pulse.value = withTiming(1);
         }
-        
+
         if (state === 'PROCESSING') {
             setProcessingProgress(0);
             const interval = setInterval(() => {
@@ -170,9 +261,9 @@ export default function RecordIdeaScreen() {
     // Start Conversation in Supabase
     const startIdeaConversation = async () => {
         console.log('Starting idea conversation. Local user state:', user?.id, user?.email);
-        
+
         let currentUser = user;
-        
+
         // If local user is missing or pending, try to get fresh session from Supabase directly
         if (!currentUser || currentUser.id === 'pending') {
             console.log('Local user state is incomplete. Attempting to fetch fresh user from Supabase...');
@@ -191,20 +282,20 @@ export default function RecordIdeaScreen() {
         // We allow 'pending' users (registered but not verified) to save notes
         // If they have an ID (even 'pending'), we use it
         const finalUserId = currentUser.id === 'pending' ? 'anonymous' : currentUser.id;
-        
+
         try {
             const insertData: any = {
                 persona_name: 'IdeaBot',
                 title: 'New Idea Record',
                 status: 'active'
             };
-            
+
             if (currentUser.id !== 'pending') {
                 insertData.user_id = currentUser.id;
             }
             // If user is pending, it might fail insert if user_id is required
             // Let's check common behavior. Usually we'd use a temporary ID or allow null user_id
-            
+
             const { data, error } = await supabase
                 .from('conversations')
                 .insert(insertData)
@@ -226,20 +317,34 @@ export default function RecordIdeaScreen() {
      */
     async function startRecording() {
         try {
-            if (permissionResponse?.status !== 'granted') {
+            setRecording(null); // Clear previous
+            
+            // Check permissions explicitly
+            let status = permissionResponse;
+            if (status?.status !== 'granted') {
                 console.log('Requesting permissions..');
-                await requestPermission();
+                status = await requestPermission();
             }
+            
+            if (status.status !== 'granted') {
+                Alert.alert("Permission Required", "Please allow microphone access to record your ideas.");
+                return;
+            }
+
+            // High-quality recording requires specific mode
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: true,
                 playsInSilentModeIOS: true,
+                shouldDuckAndroid: true,
+                playThroughEarpieceAndroid: false,
+                staysActiveInBackground: true,
             });
 
             console.log('Starting recording..');
-            const { recording } = await Audio.Recording.createAsync( 
-                Audio.RecordingOptionsPresets.HIGH_QUALITY 
+            const { recording } = await Audio.Recording.createAsync(
+                Audio.RecordingOptionsPresets.HIGH_QUALITY
             );
-            
+
             recording.setOnRecordingStatusUpdate((status) => {
                 if (status.isRecording && status.metering !== undefined) {
                     metering.value = withTiming(status.metering, { duration: 100 });
@@ -254,7 +359,7 @@ export default function RecordIdeaScreen() {
             console.log('Recording started');
         } catch (err) {
             console.error('Failed to start recording', err);
-            Alert.alert("Error", "Could not start recording.");
+            Alert.alert("Error", "Could not start recording. Check if another app is using the mic.");
         }
     }
 
@@ -289,8 +394,8 @@ export default function RecordIdeaScreen() {
         setRecording(null);
         await recording.stopAndUnloadAsync();
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-        
-        const uri = recording.getURI(); 
+
+        const uri = recording.getURI();
         console.log('Recording stopped and stored at', uri);
 
         if (uri) {
@@ -323,14 +428,14 @@ export default function RecordIdeaScreen() {
             if (data.transcription) {
                 setTranscription(data.transcription);
                 const result = await startIdeaConversation();
-                
+
                 if (isCancelledRef.current) return;
-                
+
                 setState('REFINE'); // Switch UI immediately
-                
+
                 // If result is a valid UUID
                 if (typeof result === 'string' && result.includes('-') && result.length > 20) {
-                    fetchInitialAIResponse(result, data.transcription); 
+                    fetchInitialAIResponse(result, data.transcription);
                 } else if (result === 'AUTH_REQUIRED') {
                     Alert.alert("Note", "Sign in to save this idea and chat with Dahlia!");
                 } else {
@@ -353,7 +458,7 @@ export default function RecordIdeaScreen() {
     async function fetchInitialAIResponse(convId: string, transcribedText: string) {
         try {
             console.log('Fetching initial AI response for:', transcribedText);
-            
+
             // Add a "Thinking" placeholder
             const thinkingMsg: Message = {
                 role: 'assistant',
@@ -465,7 +570,7 @@ export default function RecordIdeaScreen() {
                 const response = await fetch(audioUri);
                 const blob = await response.blob();
                 const fileName = `${user.id}/ideas/${Date.now()}.m4a`;
-                
+
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('idea_recordings')
                     .upload(fileName, blob, { contentType: 'audio/m4a' });
@@ -570,7 +675,7 @@ export default function RecordIdeaScreen() {
             });
 
             const data = await response.json();
-            
+
             if (data.response) {
                 // Remove thinking message and add actual AI response
                 setMessages(prev => {
@@ -582,7 +687,7 @@ export default function RecordIdeaScreen() {
                     };
                     return [...newMessages, aiResponse];
                 });
-                
+
                 await supabase.from('conversation_messages').insert({
                     conversation_id: conversationId,
                     role: 'assistant',
@@ -603,7 +708,7 @@ export default function RecordIdeaScreen() {
                 <View style={tw`px-6 pt-16 pb-4 flex-row items-center justify-between`}>
                     <TouchableOpacity
                         onPress={() => router.back()}
-                        style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
+                        style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center`}
                         activeOpacity={0.7}
                     >
                         <ChevronLeft color="#fff" size={24} />
@@ -634,7 +739,7 @@ export default function RecordIdeaScreen() {
                             setState('IDLE');
                         } else router.back();
                     }}
-                    style={tw`w-11 h-11 rounded-full border border-white/20 bg-white/5 items-center justify-center`}
+                    style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center`}
                 >
                     <ChevronLeft color="#fff" size={24} />
                 </TouchableOpacity>
@@ -662,43 +767,44 @@ export default function RecordIdeaScreen() {
                     <View style={tw`flex-1`}>
                         {state === 'IDLE' && (
                             <Animated.View entering={FadeIn} exiting={FadeOut} style={tw`flex-1 items-center justify-between px-6 pb-12 pt-8`}>
-                                <View style={tw`items-center mt-4`}>
+                                <View style={tw`items-center mt-2`}>
                                     <Text style={tw`text-white font-[InterTight-Medium] text-[22px]`}>
                                         Ready to capture your voice?
                                     </Text>
                                 </View>
-                                
+
                                 <View style={tw`flex-1 items-center justify-center w-full`}>
-                                    <View style={tw`w-64 h-64 rounded-full bg-accent-violet/10 border border-white/5 items-center justify-center`}>
-                                        <View style={tw`w-48 h-48 rounded-full bg-accent-violet/20 blur-xl absolute`} />
-                                        <View style={tw`w-32 h-32 rounded-full bg-[#22d3ee]/20 blur-2xl absolute -top-4 -left-4`} />
-                                        <View style={tw`w-32 h-32 rounded-full bg-[#ec4899]/20 blur-2xl absolute -bottom-4 -right-4`} />
+                                    <View style={tw`w-80 h-80 items-center justify-center`}>
+                                        <AIAudioVisualizer metering={metering} />
                                     </View>
                                 </View>
 
                                 <View style={tw`items-center flex-row justify-center w-full relative mb-8`}>
-                                    <TouchableOpacity style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute left-0`}>
-                                        <Play color="#fff" size={20} opacity={0.5} />
+                                    <TouchableOpacity style={tw`w-14 h-14 rounded-full overflow-hidden bg-white/10 absolute left-0`}>
+                                        <BlurView intensity={20} tint="dark" style={tw`flex-1 items-center justify-center border border-white/10 rounded-full`}>
+                                            <Play color="#fff" size={20} opacity={0.6} />
+                                        </BlurView>
                                     </TouchableOpacity>
-                                    
+
                                     <View style={tw`items-center justify-center`}>
                                         <TouchableOpacity
                                             onPress={startRecording}
                                             activeOpacity={0.8}
                                             onPressIn={() => micScale.value = withSpring(0.9)}
                                             onPressOut={() => micScale.value = withSpring(1)}
-                                            style={tw`w-24 h-24 rounded-full bg-white/10 border border-white/20 items-center justify-center shadow-2xl overflow-hidden`}
+                                            style={tw`w-24 h-24 rounded-full overflow-hidden bg-white/10`}
                                         >
-                                            <View style={tw`absolute inset-0 bg-accent-violet/50 opacity-50 blur-xl`} />
-                                            <View style={tw`w-16 h-16 rounded-full bg-[#9b6dff] items-center justify-center shadow-lg`}>
-                                                <Mic color="#fff" size={32} />
-                                            </View>
+                                            <BlurView intensity={30} tint="dark" style={tw`flex-1 items-center justify-center border border-white/20 rounded-full`}>
+                                                <Mic color="#fff" size={40} />
+                                            </BlurView>
                                         </TouchableOpacity>
-                                        <Text style={tw`text-white/70 font-[InterTight-Medium] text-[15px] mt-4`}>Record Now</Text>
+                                        <Text style={tw`text-white/70 font-[InterTight-Medium] text-lg mt-4`}>Record Now</Text>
                                     </View>
-                                    
-                                    <TouchableOpacity style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute right-0`}>
-                                        <RotateCcw color="#fff" size={20} opacity={0.5} />
+
+                                    <TouchableOpacity style={tw`w-14 h-14 rounded-full overflow-hidden bg-white/10 absolute right-0`}>
+                                        <BlurView intensity={20} tint="dark" style={tw`flex-1 items-center justify-center border border-white/10 rounded-full`}>
+                                            <RotateCcw color="#fff" size={20} opacity={0.6} />
+                                        </BlurView>
                                     </TouchableOpacity>
                                 </View>
                             </Animated.View>
@@ -706,57 +812,50 @@ export default function RecordIdeaScreen() {
 
                         {state === 'RECORDING' && (
                             <Animated.View entering={FadeIn} exiting={FadeOut} style={tw`flex-1 items-center justify-between pb-12 pt-8`}>
-                                <View style={tw`items-center mt-4 px-6`}>
-                                    <Text style={tw`text-white font-[InterTight-Medium] text-[22px] px-8 text-center`}>
-                                        Record, process, and manage your audio with a single tap
+                                <View style={tw`items-center mt-2`}>
+                                    <Text style={tw`text-white font-[InterTight-Medium] text-[22px]`}>
+                                        Capturing your audio...
                                     </Text>
                                 </View>
-                                
+
                                 <View style={tw`flex-1 items-center justify-center w-full`}>
-                                    <View style={tw`w-full h-40 flex-row items-center justify-center overflow-hidden`}>
-                                        {Array.from({ length: 60 }).map((_, i) => (
-                                            <VisualizerBar 
-                                                key={i} 
-                                                index={i} 
-                                                totalBars={60}
-                                                metering={metering} 
-                                                isPaused={isPaused} 
-                                            />
-                                        ))}
-                                    </View>
-                                    
-                                    <Text style={tw`text-[#b895ff] font-[InterTight-Light] text-4xl mt-12 tracking-wider`}>
+                                    <WaveformVisualizer metering={metering} isPaused={isPaused} />
+
+                                    <Text style={tw`text-white/80 font-[InterTight] font-light text-4xl mt-12 tracking-wider`}>
                                         {formatTime(seconds)}
                                     </Text>
                                 </View>
 
                                 <View style={tw`items-center flex-row justify-center w-full relative mb-8 px-6`}>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         onPress={isPaused ? resumeRecording : pauseRecording}
-                                        style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute left-6`}
+                                        style={tw`w-14 h-14 rounded-full overflow-hidden bg-white/10 absolute left-6`}
                                     >
-                                        {isPaused ? <Play color="#fff" size={20} /> : <Pause color="#fff" size={20} />}
+                                        <BlurView intensity={20} tint="dark" style={tw`flex-1 items-center justify-center border border-white/10 rounded-full`}>
+                                            {isPaused ? <Play color="#fff" size={20} /> : <Pause color="#fff" size={20} />}
+                                        </BlurView>
                                     </TouchableOpacity>
-                                    
+
                                     <View style={tw`items-center justify-center`}>
                                         <TouchableOpacity
                                             onPress={stopRecording}
                                             activeOpacity={0.8}
-                                            style={tw`w-24 h-24 rounded-full bg-white/10 border border-white/20 items-center justify-center shadow-2xl overflow-hidden`}
+                                            style={tw`w-24 h-24 rounded-full overflow-hidden bg-white/10`}
                                         >
-                                            <View style={tw`absolute inset-0 bg-accent-violet/50 opacity-50 blur-xl`} />
-                                            <View style={tw`w-16 h-16 rounded-full bg-[#9b6dff] items-center justify-center shadow-lg`}>
-                                                <Mic color="#fff" size={32} />
-                                            </View>
+                                            <BlurView intensity={30} tint="dark" style={tw`flex-1 items-center justify-center border border-white/20 rounded-full`}>
+                                                <Square color="#fff" size={32} fill="#fff" />
+                                            </BlurView>
                                         </TouchableOpacity>
-                                        <Text style={tw`text-white/70 font-[InterTight-Medium] text-[15px] mt-4`}>Stop Recording</Text>
+                                        <Text style={tw`text-white/70 font-[InterTight-Medium] text-lg mt-4`}>Stop Recording</Text>
                                     </View>
-                                    
-                                    <TouchableOpacity 
+
+                                    <TouchableOpacity
                                         onPress={handleRestart}
-                                        style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute right-6`}
+                                        style={tw`w-14 h-14 rounded-full overflow-hidden bg-white/10 absolute right-6`}
                                     >
-                                        <RotateCcw color="#fff" size={20} />
+                                        <BlurView intensity={20} tint="dark" style={tw`flex-1 items-center justify-center border border-white/10 rounded-full`}>
+                                            <RotateCcw color="#fff" size={20} />
+                                        </BlurView>
                                     </TouchableOpacity>
                                 </View>
                             </Animated.View>
@@ -764,47 +863,48 @@ export default function RecordIdeaScreen() {
 
                         {state === 'PROCESSING' && (
                             <Animated.View entering={FadeIn} style={tw`flex-1 items-center justify-between px-6 pb-12 pt-8`}>
-                                <View style={tw`items-center mt-4 w-full px-4`}>
+                                <View style={tw`items-center mt-2 w-full px-4`}>
                                     <Text style={tw`text-white font-[InterTight-Medium] text-[26px] text-center leading-[32px]`}>
                                         We're carefully processing your audio, this will only take a moment.
                                     </Text>
                                 </View>
-                                
-                                <View style={tw`flex-1 items-center justify-center w-full`}>
-                                    <View style={tw`w-64 h-64 items-center justify-center rounded-full border-[2px] border-[#9b6dff]/30 shadow-2xl shadow-purple-500/40 relative overflow-hidden bg-[#2D065C]`}>
-                                        {/* Gradients to look like liquid chrome/glass */}
-                                        <View style={tw`w-full h-full absolute top-0 left-0 bg-[#9b6dff]/40 opacity-50 blur-2xl`} />
-                                        <View style={tw`absolute inset-0 rounded-full bg-[#8b5cf6]/20 blur-xl`} />
-                                        <View style={tw`absolute top-2 left-6 w-16 h-8 rounded-full bg-white/20 rotate-[-30deg] blur-md`} />
-                                        <View style={tw`absolute bottom-4 right-4 w-24 h-24 rounded-full bg-[#ec4899]/30 blur-2xl`} />
-                                        <View style={tw`absolute top-1/2 left-1/2 -ml-12 -mt-12 w-24 h-24 rounded-full bg-[#22d3ee]/20 blur-2xl`} />
-                                        
-                                        <Text style={tw`text-white font-[InterTight-Light] text-6xl shadow-md tracking-wider`}>
+
+                                <View style={tw`flex-1 items-center justify-center w-full relative`}>
+                                    <View style={tw`w-80 h-80 items-center justify-center`}>
+                                        <AIAudioVisualizer metering={{ value: -30 }} />
+                                    </View>
+                                    
+                                    <View style={tw`absolute inset-0 items-center justify-center`}>
+                                        <Animated.Text entering={FadeIn} style={tw`text-white font-[InterTight-Light] text-6xl tracking-wider`}>
                                             {processingProgress}%
-                                        </Text>
+                                        </Animated.Text>
                                     </View>
                                 </View>
 
                                 <View style={tw`items-center flex-row justify-center w-full relative mb-8`}>
-                                    <View style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute left-0`}>
-                                        <Play color="#fff" size={20} opacity={0.2} />
+                                    <View style={tw`w-14 h-14 rounded-full overflow-hidden bg-white/5 absolute left-0`}>
+                                        <BlurView intensity={10} tint="dark" style={tw`flex-1 items-center justify-center border border-white/5 rounded-full`}>
+                                            <Play color="#fff" size={20} opacity={0.2} />
+                                        </BlurView>
                                     </View>
-                                    
+
                                     <View style={tw`items-center justify-center`}>
                                         <TouchableOpacity
                                             onPress={cancelProcessing}
                                             activeOpacity={0.8}
-                                            style={tw`w-20 h-20 rounded-full bg-red-500/20 border border-red-500/50 items-center justify-center shadow-2xl shadow-red-500/20`}
+                                            style={tw`w-20 h-20 rounded-full overflow-hidden bg-red-500/10`}
                                         >
-                                            <View style={tw`w-14 h-14 rounded-full bg-[#ff4a4a] items-center justify-center shadow-lg`}>
-                                                <CloseIcon color="#fff" size={24} />
-                                            </View>
+                                            <BlurView intensity={30} tint="dark" style={tw`flex-1 items-center justify-center border border-red-500/30 rounded-full`}>
+                                                <CloseIcon color="#ff4a4a" size={28} strokeWidth={2.5} />
+                                            </BlurView>
                                         </TouchableOpacity>
                                         <Text style={tw`text-white/70 font-[InterTight-Medium] text-[15px] mt-4`}>Cancel Process</Text>
                                     </View>
-                                    
-                                    <View style={tw`w-14 h-14 rounded-full bg-white/5 border border-white/10 items-center justify-center absolute right-0`}>
-                                        <Play color="#fff" size={20} opacity={0.2} />
+
+                                    <View style={tw`w-14 h-14 rounded-full overflow-hidden bg-white/5 absolute right-0`}>
+                                        <BlurView intensity={10} tint="dark" style={tw`flex-1 items-center justify-center border border-white/5 rounded-full`}>
+                                            <Play color="#fff" size={20} opacity={0.2} />
+                                        </BlurView>
                                     </View>
                                 </View>
                             </Animated.View>
@@ -822,12 +922,12 @@ export default function RecordIdeaScreen() {
                             <Animated.View entering={SlideInDown.duration(600)} style={tw`mb-8`}>
                                 <GlassCard style={tw`bg-white/10 border-white/20 p-6`} noPadding>
                                     <View style={tw`flex-row items-center mb-4`}>
-                                        <View style={tw`w-8 h-8 rounded-full bg-accent-violet/20 items-center justify-center mr-3`}>
-                                            <Sparkles color="#8b5cf6" size={16} />
+                                        <View style={tw`w-8 h-8 rounded-full bg-accent-violet/20 items-center justify-center mr-1`}>
+                                            <LogoSVG width={16} height={16} color="#ffffff" />
                                         </View>
-                                        <Text style={tw`text-white font-[InterTight-SemiBold] text-base`}>Original Thought</Text>
+                                        <Text style={tw`text-white font-[InterTight] font-semibold text-base`}>Original Thought</Text>
                                     </View>
-                                    <Text style={tw`text-gray-200 font-[InterTight] text-[15px] leading-6 italic`}>
+                                    <Text style={tw`text-gray-200 font-[InterTight] text-lg leading-6`}>
                                         "{transcription}"
                                     </Text>
                                 </GlassCard>
@@ -843,10 +943,10 @@ export default function RecordIdeaScreen() {
                                 >
                                     <View style={tw`flex-row ${msg.role === 'user' ? 'flex-row-reverse' : ''} max-w-[85%]`}>
                                         <View style={tw`w-8 h-8 rounded-full items-center justify-center ${msg.role === 'user' ? 'bg-white/20 ml-3' : 'bg-accent-violet mt-1 mr-3'}`}>
-                                            {msg.role === 'user' ? <User color="#fff" size={16} /> : <Sparkles color="#fff" size={16} />}
+                                            {msg.role === 'user' ? <User color="#fff" size={16} /> : <LogoSVG width={16} height={16} color="#fff" />}
                                         </View>
                                         <View style={tw`p-4 rounded-2xl ${msg.role === 'assistant' ? 'bg-white/5 border border-white/10 rounded-tl-none' : 'bg-accent-violet rounded-tr-none'}`}>
-                                            <Text style={tw`text-white font-[InterTight] text-[15px] leading-5`}>
+                                            <Text style={tw`text-gray-100 font-[InterTight] text-lg leading-5`}>
                                                 {msg.content}
                                             </Text>
                                         </View>
@@ -857,14 +957,10 @@ export default function RecordIdeaScreen() {
 
                         {/* Input Area */}
                         <BlurView intensity={30} tint="dark" style={tw`absolute bottom-0 left-0 right-0 p-6 pt-4 border-t border-white/10`}>
-                            {/* Debug Info */}
-                            <Text style={tw`text-[10px] text-white/20 text-center mb-2`}>
-                                ID: {user?.id} | State: {state}
-                            </Text>
                             <View style={tw`flex-row items-center gap-3`}>
                                 <View style={tw`flex-1 flex-row items-center bg-white/5 border border-white/10 rounded-full p-2`}>
-                                    <TouchableOpacity 
-                                        onPress={() => setShowUploadModal(true)} 
+                                    <TouchableOpacity
+                                        onPress={() => setShowUploadModal(true)}
                                         style={tw`p-2`}
                                     >
                                         <Paperclip color="#aaa" size={20} />
@@ -885,7 +981,7 @@ export default function RecordIdeaScreen() {
                                         <Send color="#000" size={18} />
                                     </TouchableOpacity>
                                 </View>
-                                
+
                                 <TouchableOpacity
                                     onPress={handleSave}
                                     style={tw`w-14 h-14 rounded-full bg-accent-violet items-center justify-center shadow-lg shadow-accent-violet/30`}
