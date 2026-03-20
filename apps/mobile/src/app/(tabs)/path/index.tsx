@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { PathCard } from '@/components/path/PathCard';
 import { PathCardResult } from '@/components/path/PathCardResult';
 import { suggestedPaths } from '@/data/pathMockData';
+import { parsePathMeta } from '@/utils/pathUtils';
 
 export default function PathScreen() {
     const { user } = useAuth();
@@ -106,8 +107,8 @@ export default function PathScreen() {
 
                 {/* Section Header */}
                 <View style={tw`px-6 mb-4`}>
-                    <Text style={tw`text-gray-300 font-[InterTight-SemiBold] text-xl`}>
-                        {showSearchResults ? 'Search results' : 'Suggested starts'}
+                    <Text style={tw`text-gray-300 font-[InterTight-SemiBold] text-base uppercase`}>
+                        {showSearchResults ? 'Search results' : 'All roadmaps'}
                     </Text>
                 </View>
 

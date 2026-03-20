@@ -9,4 +9,5 @@ export const AI_API = {
     ROADMAP: `${BACKEND_URL}/api/ai/roadmap`,
     PARSE_CV: `${BACKEND_URL}/api/ai/parse-cv`,
     STT: `${BACKEND_URL}/api/ai/stt`,
+    TTS: `${BACKEND_URL}/api/ai/tts`,
 };

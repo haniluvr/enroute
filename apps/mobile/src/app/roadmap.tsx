@@ -61,9 +61,9 @@ export default function RoadmapScreen() {
                 .insert({
                     user_id: user.id,
                     goal: goal,
-                    estimated_duration: '6-8 Months', // AI could generate this too
-                    salary_range: '$80k - $120k',
-                    demand_level: 'High',
+                    estimated_duration: data.estimated_duration || '6-12 Months',
+                    salary_range: data.salary || 'Competitive',
+                    demand_level: data.demand || 'High',
                     current_skills: selectedSkills
                 })
                 .select()

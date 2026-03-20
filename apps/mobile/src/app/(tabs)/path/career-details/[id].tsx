@@ -5,6 +5,8 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
+    Dimensions,
+    ImageBackground,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Lightbulb, Calendar, Download, FileText, Video, Wrench, Star, ChevronRight } from 'lucide-react-native';
@@ -13,14 +15,115 @@ import { GlassCard } from '@/components/GlassCard';
 import { GlassButton } from '@/components/GlassButton';
 import { careerDetailsMap } from '@/data/pathMockData';
 import { pathIconMap } from '@/components/path/pathIconMap';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/config/supabase';
+import type { CareerDetails, ResourceItem } from '@/types/path';
+import { parsePathMeta, parseModuleTitle } from '@/utils/pathUtils';
 
 export default function CareerDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
+    const [career, setCareer] = useState<CareerDetails | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const career = id ? careerDetailsMap[id] : null;
+    useEffect(() => {
+        if (id) fetchCareerData();
+    }, [id]);
+
+    const fetchCareerData = async () => {
+        setIsLoading(true);
+        try {
+            // 1. Fetch Path
+            const { data: pathData, error: pathError } = await supabase
+                .from('learning_paths')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (pathError) throw pathError;
+
+            // 2. Fetch Modules
+            const { data: modulesData, error: modulesError } = await supabase
+                .from('learning_modules')
+                .select('*')
+                .eq('path_id', id);
+
+            if (modulesError) throw modulesError;
+
+            // 3. Parse Overview for stats
+            const overview = pathData.overview || '';
+            const salaryMatch = overview.match(/Average Market Salary: (.*)/);
+            const demandMatch = overview.match(/Market Demand: (.*)/);
+
+            const allModules = modulesData || [];
+            
+            const videos: ResourceItem[] = allModules
+                .filter(m => m.content_type === 'video')
+                .map(m => ({
+                    id: m.id,
+                    name: m.title,
+                    url: m.content_url,
+                    duration: Math.floor(Math.random() * 15) + 5
+                }));
+
+            const pdfs: ResourceItem[] = allModules.slice(0, 3).map(m => {
+                const { cleanTitle } = parseModuleTitle(m.title);
+                return {
+                    id: m.id + '-pdf',
+                    name: `Comprehensive Guide to ${cleanTitle}`,
+                    url: '',
+                    fileSize: `${(Math.random() * 3 + 1).toFixed(1)} MB`
+                };
+            });
+
+            const articles: ResourceItem[] = allModules.slice(3, 7).map(m => {
+                const { cleanTitle } = parseModuleTitle(m.title);
+                return {
+                    id: m.id + '-article',
+                    name: `Best Practices in ${cleanTitle}`,
+                    url: `https://www.google.com/search?q=${encodeURIComponent('best practices ' + cleanTitle)}`
+                };
+            });
+
+            const mappedCareer: CareerDetails = {
+                id: pathData.id,
+                title: pathData.title,
+                description: overview.split('\n')[0],
+                icon: 'Palette', // Placeholder icon
+                lastUpdated: new Date(pathData.created_at).toLocaleDateString(),
+                learnItems: allModules.map(m => m.title),
+                jobDemand: demandMatch ? demandMatch[1].trim() : 'High',
+                avgSalary: salaryMatch ? salaryMatch[1].trim() : 'Competitive',
+                estTimeToComplete: '6-12 months',
+                pdfs: pdfs,
+                videos: videos,
+                articles: articles,
+                reviews: [],
+                overview: overview
+            };
+
+            setCareer(mappedCareer);
+        } catch (err) {
+            console.error('Fetch Career Error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const toggleReviewExpanded = (reviewId: string) => {
+        setExpandedReviews((prev) => ({ ...prev, [reviewId]: !prev[reviewId] }));
+    };
+
+    if (isLoading) {
+        return (
+            <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
+                <SafeAreaView style={tw`flex-1 items-center justify-center`}>
+                    <Text style={tw`text-white font-[InterTight]`}>Loading career path...</Text>
+                </SafeAreaView>
+            </GlassBackground>
+        );
+    }
 
     if (!career) {
         return (
@@ -40,11 +143,10 @@ export default function CareerDetailsScreen() {
         );
     }
 
-    const IconComponent = pathIconMap[career.icon] ?? pathIconMap.Palette;
-
-    const toggleReviewExpanded = (reviewId: string) => {
-        setExpandedReviews((prev) => ({ ...prev, [reviewId]: !prev[reviewId] }));
-    };
+    const meta = parsePathMeta(career.overview || '');
+    const cleanTitle = career.title.charAt(0).toUpperCase() + career.title.slice(1).replace(/-/g, ' ');
+    const titlePrefix = meta.type === 'skill' ? 'Learning' : 'Becoming a';
+    const IconComponent = pathIconMap[meta.icon] ?? pathIconMap.Palette;
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
@@ -62,11 +164,15 @@ export default function CareerDetailsScreen() {
                     <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-2`}>
                         Career details
                     </Text>
+                    
                     <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-4`}>
-                        Learn, practice, and grow with resources tailored for this role
+                        {meta.type === 'skill' 
+                            ? 'Master a specific technology or tool.' 
+                            : 'Learn, practice, and grow with resources tailored for this role.'}
                     </Text>
-                    <Text style={tw`text-gray-300 font-[InterTight] font-medium text-lg mb-8`}>
-                        Becoming a {career.title}
+
+                    <Text style={tw`text-white font-[InterTight] font-medium text-lg mb-2`}>
+                        {titlePrefix} {cleanTitle}
                     </Text>
 
                     {/* Card 1: Role Overview */}
@@ -75,7 +181,7 @@ export default function CareerDetailsScreen() {
                             <View style={tw`bg-[#FF9500]/20 px-3 py-1.5 rounded-full flex-row items-center border border-[#FF9500]/60 mr-2`}>
                                 <Lightbulb color="#FF9500" size={14} style={tw`mr-1.5`} />
                                 <Text style={tw`text-[#FF9500] font-[InterTight-Medium] text-sm`}>
-                                    Role overview
+                                    {meta.type === 'skill' ? 'Skill overview' : 'Role overview'}
                                 </Text>
                             </View>
                         </View>
@@ -83,11 +189,14 @@ export default function CareerDetailsScreen() {
                             What you need to learn:
                         </Text>
                         <View style={tw`mb-4 pl-2`}>
-                            {career.learnItems.map((item, i) => (
-                                <Text key={i} style={tw`text-white font-[InterTight] text-lg mb-1`}>
-                                    • {item}
-                                </Text>
-                            ))}
+                            {career.learnItems.map((item, i) => {
+                                const { cleanTitle } = parseModuleTitle(item);
+                                return (
+                                    <Text key={i} style={tw`text-white font-[InterTight] text-lg mb-2`}>
+                                        • {cleanTitle}
+                                    </Text>
+                                );
+                            })}
                         </View>
                         <View style={tw`bg-white/5 rounded-xl p-4`}>
                             <View style={tw`flex-row items-center mb-2`}>
@@ -155,19 +264,36 @@ export default function CareerDetailsScreen() {
                             <>
                                 <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-3`}>Videos</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-4`}>
-                                    {career.videos.map((video) => (
-                                        <View
-                                            key={video.id}
-                                            style={tw`w-62 h-42 bg-white/10 rounded-xl mr-3 p-3 justify-end`}
-                                        >
-                                            <Text style={tw`text-white font-[InterTight-Medium] text-sm`} numberOfLines={1}>
-                                                {video.name}
-                                            </Text>
-                                            <Text style={tw`text-gray-500 font-[InterTight] text-xs`}>
-                                                {video.duration} mins
-                                            </Text>
-                                        </View>
-                                    ))}
+                                    {career.videos.map((video) => {
+                                        const { cleanTitle } = parseModuleTitle(video.name);
+                                        const videoId = video.url?.split('v=')[1]?.split('&')[0];
+                                        const thumbnailUrl = videoId 
+                                            ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+                                            : null;
+
+                                        return (
+                                            <TouchableOpacity 
+                                                key={video.id}
+                                                activeOpacity={0.9}
+                                                onPress={() => {/* Open URL */}}
+                                            >
+                                                <ImageBackground
+                                                    source={thumbnailUrl ? { uri: thumbnailUrl } : undefined}
+                                                    style={tw`w-62 h-35 bg-white/10 rounded-xl mr-3 overflow-hidden justify-end`}
+                                                    imageStyle={tw`opacity-60`}
+                                                >
+                                                    <View style={tw`p-3 bg-black/40`}>
+                                                        <Text style={tw`text-white font-[InterTight-Medium] text-sm`} numberOfLines={1}>
+                                                            {cleanTitle}
+                                                        </Text>
+                                                        <Text style={tw`text-gray-300 font-[InterTight] text-[10px]`}>
+                                                            Tutorial Resource
+                                                        </Text>
+                                                    </View>
+                                                </ImageBackground>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
                                 </ScrollView>
                                 <View style={[tw`h-px bg-white/10 mb-4`, { width: '80%' }]} />
                             </>

@@ -13,8 +13,13 @@ import {
     Keyboard,
     Alert,
     Modal,
-    Pressable
+    Pressable,
+    Share
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import * as Speech from 'expo-speech';
+import * as FileSystem from 'expo-file-system/legacy';
+import Markdown from 'react-native-markdown-display';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { GlassBackground } from '@/components/GlassBackground';
@@ -24,6 +29,13 @@ const AIAudioWebP = require('@/assets/ai-audio.webp');
 // @ts-ignore
 import LogoSVG from '@/assets/logo.svg';
 import {
+    Paperclip,
+    Copy,
+    ThumbsUp,
+    ThumbsDown,
+    Volume1,
+    RotateCw,
+    ChevronRight,
     ChevronLeft,
     Mic,
     Square,
@@ -39,8 +51,7 @@ import {
     Camera,
     Image as ImageIcon,
     FileText,
-    X as CloseIcon,
-    Paperclip
+    X as CloseIcon
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -187,9 +198,14 @@ const AIAudioVisualizer = ({ metering }: { metering: any }) => {
 };
 
 type Message = {
+    id: string;
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+    versions?: string[];
+    currentVersion?: number;
+    feedback?: 'positive' | 'negative' | null;
+    isUpdating?: boolean;
 };
 
 type FlowState = 'IDLE' | 'RECORDING' | 'PROCESSING' | 'REFINE';
@@ -209,7 +225,18 @@ export default function RecordIdeaScreen() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef<ScrollView>(null);
+    const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
+    const currentSoundRef = useRef<Audio.Sound | null>(null);
+    const isFetchingTTSRef = useRef<string | null>(null);
 
+    // Stop audio if navigating away
+    useEffect(() => {
+        return () => {
+            if (currentSoundRef.current) {
+                currentSoundRef.current.unloadAsync();
+            }
+        };
+    }, []);
     // Pulse animation for recording
     const pulse = useSharedValue(1);
     const micScale = useSharedValue(1);
@@ -461,6 +488,7 @@ export default function RecordIdeaScreen() {
 
             // Add a "Thinking" placeholder
             const thinkingMsg: Message = {
+                id: 'thinking-' + Date.now(),
                 role: 'assistant',
                 content: 'Dahlia is analyzing your idea...',
                 timestamp: new Date()
@@ -487,9 +515,12 @@ export default function RecordIdeaScreen() {
 
             if (data.response) {
                 const aiMessage: Message = {
+                    id: Math.random().toString(36).substr(2, 9),
                     role: 'assistant',
                     content: data.response,
-                    timestamp: new Date()
+                    timestamp: new Date(),
+                    versions: [data.response],
+                    currentVersion: 0
                 };
                 // Replace thinking placeholder
                 setMessages([aiMessage]);
@@ -632,10 +663,167 @@ export default function RecordIdeaScreen() {
         }
     };
 
+    const handleRegenerate = async (messageId: string) => {
+        const messageIndex = messages.findIndex(m => m.id === messageId);
+        if (messageIndex === -1) return;
+
+        const history = messages.slice(0, messageIndex).map(m => ({
+            role: m.role,
+            content: m.content
+        }));
+
+        // Set updating state
+        setMessages(prev => prev.map(m => 
+            m.id === messageId ? { ...m, isUpdating: true } : m
+        ));
+
+        try {
+            const persona = "Dahlia, Career Success Coach";
+            const response = await fetch(AI_API.CHAT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ persona, history })
+            });
+
+            if (!response.ok) throw new Error('Regeneration failed');
+            const data = await response.json();
+
+            setMessages(prev => prev.map(m => {
+                if (m.id === messageId) {
+                    const newVersions = [...(m.versions || [m.content]), data.response];
+                    return {
+                        ...m,
+                        content: data.response,
+                        versions: newVersions,
+                        currentVersion: newVersions.length - 1,
+                        isUpdating: false
+                    };
+                }
+                return m;
+            }));
+        } catch (error) {
+            console.error('Regeneration Error:', error);
+            setMessages(prev => prev.map(m => 
+                m.id === messageId ? { ...m, isUpdating: false } : m
+            ));
+            Alert.alert("Error", "Could not regenerate response.");
+        }
+    };
+
+    const navigateVersion = (messageId: string, direction: 'prev' | 'next') => {
+        setMessages(prev => prev.map(m => {
+            if (m.id === messageId && m.versions) {
+                const newVersion = direction === 'prev' 
+                    ? Math.max(0, (m.currentVersion || 0) - 1)
+                    : Math.min(m.versions.length - 1, (m.currentVersion || 0) + 1);
+                
+                return {
+                    ...m,
+                    content: m.versions[newVersion],
+                    currentVersion: newVersion
+                };
+            }
+            return m;
+        }));
+    };
+
+    const handleCopy = async (text: string) => {
+        await Clipboard.setStringAsync(text);
+        // We could show a toast here if we had a toast component
+    };
+
+    const handleSpeak = async (text: string, messageId: string) => {
+        // Prevent multiple simultaneous clicks trying to fetch audio
+        if (isFetchingTTSRef.current) return;
+        
+        // Stop current audio properly
+        if (currentSoundRef.current) {
+            await currentSoundRef.current.stopAsync();
+            await currentSoundRef.current.unloadAsync();
+            currentSoundRef.current = null;
+        }
+
+        // If clicking the same message that was already playing, just stop it
+        if (isSpeaking === messageId) {
+            setIsSpeaking(null);
+            return;
+        }
+
+        try {
+            isFetchingTTSRef.current = messageId;
+            setIsSpeaking(messageId);
+
+            // Call ElevenLabs TTS via our backend
+            const response = await fetch(AI_API.TTS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`TTS request failed: ${response.status} - ${errorBody}`);
+            }
+
+            const data = await response.json();
+            if (!data.audioUri) throw new Error('No audio URI returned from server');
+
+            // Extract the base64 content
+            const base64Data = data.audioUri.replace(/^data:audio\/mpeg;base64,/, '');
+
+            // Write to a temp file
+            const tempPath = `${FileSystem.cacheDirectory}dahlia_tts_${Date.now()}.mp3`;
+            await FileSystem.writeAsStringAsync(tempPath, base64Data, {
+                encoding: FileSystem.EncodingType.Base64
+            });
+
+            // Configure audio session for playback
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: false,
+                playsInSilentModeIOS: true,
+                staysActiveInBackground: false,
+            });
+
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: tempPath },
+                { shouldPlay: true }
+            );
+            
+            currentSoundRef.current = sound;
+
+            sound.setOnPlaybackStatusUpdate(async (status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    setIsSpeaking(null);
+                    await sound.unloadAsync();
+                    currentSoundRef.current = null;
+                    // Clean up temp file
+                    await FileSystem.deleteAsync(tempPath, { idempotent: true });
+                }
+            });
+
+        } catch (error: any) {
+            console.error('TTS Error:', error?.message || error);
+            setIsSpeaking(null);
+            Alert.alert('Dahlia is quiet', "Her voice isn't available right now. Try again in a moment.");
+        } finally {
+            isFetchingTTSRef.current = null;
+        }
+    };
+
+    const handleFeedback = (messageId: string, type: 'positive' | 'negative') => {
+        setMessages(prev => prev.map(m => {
+            if (m.id === messageId) {
+                return { ...m, feedback: m.feedback === type ? null : type };
+            }
+            return m;
+        }));
+    };
+
     const handleSendMessage = async () => {
         if (!inputText.trim() || !conversationId) return;
 
         const newMessage: Message = {
+            id: Math.random().toString(36).substr(2, 9),
             role: 'user',
             content: inputText,
             timestamp: new Date()
@@ -648,6 +836,7 @@ export default function RecordIdeaScreen() {
 
         // Add thinking placeholder
         const thinkingMsg: Message = {
+            id: 'thinking-' + Date.now(),
             role: 'assistant',
             content: 'Thinking...',
             timestamp: new Date()
@@ -681,9 +870,12 @@ export default function RecordIdeaScreen() {
                 setMessages(prev => {
                     const newMessages = prev.filter(msg => msg.content !== 'Thinking...');
                     const aiResponse: Message = {
+                        id: Math.random().toString(36).substr(2, 9),
                         role: 'assistant',
                         content: data.response,
-                        timestamp: new Date()
+                        timestamp: new Date(),
+                        versions: [data.response],
+                        currentVersion: 0
                     };
                     return [...newMessages, aiResponse];
                 });
@@ -903,7 +1095,7 @@ export default function RecordIdeaScreen() {
 
                                     <View style={tw`w-14 h-14 rounded-full overflow-hidden bg-white/5 absolute right-0`}>
                                         <BlurView intensity={10} tint="dark" style={tw`flex-1 items-center justify-center border border-white/5 rounded-full`}>
-                                            <Play color="#fff" size={20} opacity={0.2} />
+                                            <RotateCcw color="#fff" size={20} opacity={0.2} />
                                         </BlurView>
                                     </View>
                                 </View>
@@ -919,7 +1111,7 @@ export default function RecordIdeaScreen() {
                             showsVerticalScrollIndicator={false}
                         >
                             {/* Transcription Header Card */}
-                            <Animated.View entering={SlideInDown.duration(600)} style={tw`mb-8`}>
+                            <View style={tw`mb-8`}>
                                 <GlassCard style={tw`bg-white/10 border-white/20 p-6`} noPadding>
                                     <View style={tw`flex-row items-center mb-4`}>
                                         <View style={tw`w-8 h-8 rounded-full bg-accent-violet/20 items-center justify-center mr-1`}>
@@ -931,7 +1123,7 @@ export default function RecordIdeaScreen() {
                                         "{transcription}"
                                     </Text>
                                 </GlassCard>
-                            </Animated.View>
+                            </View>
 
                             {/* Chat Messages */}
                             {messages.map((msg, index) => (
@@ -941,15 +1133,95 @@ export default function RecordIdeaScreen() {
                                     layout={Layout.springify()}
                                     style={tw`mb-6 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                                 >
-                                    <View style={tw`flex-row ${msg.role === 'user' ? 'flex-row-reverse' : ''} max-w-[85%]`}>
-                                        <View style={tw`w-8 h-8 rounded-full items-center justify-center ${msg.role === 'user' ? 'bg-white/20 ml-3' : 'bg-accent-violet mt-1 mr-3'}`}>
-                                            {msg.role === 'user' ? <User color="#fff" size={16} /> : <LogoSVG width={16} height={16} color="#fff" />}
-                                        </View>
-                                        <View style={tw`p-4 rounded-2xl ${msg.role === 'assistant' ? 'bg-white/5 border border-white/10 rounded-tl-none' : 'bg-accent-violet rounded-tr-none'}`}>
-                                            <Text style={tw`text-gray-100 font-[InterTight] text-lg leading-5`}>
-                                                {msg.content}
-                                            </Text>
-                                        </View>
+                                    <View style={tw`w-full ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-full`}>
+                                        {msg.role === 'user' && (
+                                            <View style={tw`flex-row flex-row-reverse max-w-[85%]`}>
+                                                <View style={tw`w-8 h-8 rounded-full items-center justify-center bg-white/20 ml-3`}>
+                                                    <User color="#fff" size={16} />
+                                                </View>
+                                                <View style={tw`p-4 rounded-2xl bg-white/5 border border-white/10 rounded-tr-none`}>
+                                                    <Text style={tw`text-white font-[InterTight] text-lg leading-6`}>
+                                                        {msg.content}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        )}
+
+                                        {msg.role === 'assistant' && (
+                                            <View style={tw`w-full mb-2`}>
+                                                {msg.isUpdating ? (
+                                                    <View style={tw`py-4`}>
+                                                        <Text style={tw`text-white/60 font-[InterTight-Medium] italic text-lg`}>
+                                                            Dahlia is thinking...
+                                                        </Text>
+                                                    </View>
+                                                ) : (
+                                                    <Markdown
+                                                        style={{
+                                                            body: { color: '#f3f4f6', fontFamily: 'InterTight', fontSize: 18, lineHeight: 28 },
+                                                            paragraph: { marginBottom: 16 },
+                                                            bullet_list: { marginBottom: 16 },
+                                                            ordered_list: { marginBottom: 16 },
+                                                            strong: { fontWeight: '700', color: '#fff' },
+                                                            em: { fontStyle: 'italic' },
+                                                            link: { color: '#8b5cf6' },
+                                                        }}
+                                                    >
+                                                        {msg.content}
+                                                    </Markdown>
+                                                )}
+
+                                                {/* AI Actions Row */}
+                                                <View style={tw`flex-row items-center justify-between mt-2 pt-2 -ml-2`}>
+                                                    <View style={tw`flex-row items-center gap-4`}>
+                                                        <TouchableOpacity onPress={() => handleCopy(msg.content)} style={tw`p-2`}>
+                                                            <Copy color="#ffffff" opacity={0.4} size={18} />
+                                                        </TouchableOpacity>
+                                                        
+                                                        <TouchableOpacity onPress={() => handleFeedback(msg.id, 'positive')} style={tw`p-2`}>
+                                                            <ThumbsUp 
+                                                                color={msg.feedback === 'positive' ? '#ffffff' : '#ffffff'} 
+                                                                fill={msg.feedback === 'positive' ? '#ffffff' : 'transparent'}
+                                                                opacity={msg.feedback === 'positive' ? 1 : 0.4} 
+                                                                size={18} 
+                                                            />
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity onPress={() => handleFeedback(msg.id, 'negative')} style={tw`p-2`}>
+                                                            <ThumbsDown 
+                                                                color={msg.feedback === 'negative' ? '#ffffff' : '#ffffff'} 
+                                                                fill={msg.feedback === 'negative' ? '#ffffff' : 'transparent'}
+                                                                opacity={msg.feedback === 'negative' ? 1 : 0.4} 
+                                                                size={18} 
+                                                            />
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity onPress={() => handleRegenerate(msg.id)} style={tw`p-2`}>
+                                                            <RotateCw color="#ffffff" opacity={0.4} size={18} />
+                                                        </TouchableOpacity>
+
+                                                        <TouchableOpacity onPress={() => handleSpeak(msg.content, msg.id)} style={tw`p-2`}>
+                                                            <Volume1 color={isSpeaking === msg.id ? '#ffffff' : '#ffffff'} opacity={isSpeaking === msg.id ? 1 : 0.4} size={18} />
+                                                        </TouchableOpacity>
+                                                    </View>
+
+                                                    {/* Regeneration Version Nav */}
+                                                    {(msg.versions && msg.versions.length > 1) && (
+                                                        <View style={tw`flex-row items-center gap-2 pr-2`}>
+                                                            <TouchableOpacity onPress={() => navigateVersion(msg.id, 'prev')} disabled={msg.currentVersion === 0} style={tw`${msg.currentVersion === 0 ? 'opacity-20' : 'opacity-60'}`}>
+                                                                <ChevronLeft color="#fff" size={20} />
+                                                            </TouchableOpacity>
+                                                            <Text style={tw`text-white/60 text-xs font-[InterTight-Medium]`}>
+                                                                {(msg.currentVersion || 0) + 1}/{msg.versions.length}
+                                                            </Text>
+                                                            <TouchableOpacity onPress={() => navigateVersion(msg.id, 'next')} disabled={msg.currentVersion === msg.versions.length - 1} style={tw`${msg.currentVersion === msg.versions.length - 1 ? 'opacity-20' : 'opacity-60'}`}>
+                                                                <ChevronRight color="#fff" size={20} />
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        )}
                                     </View>
                                 </Animated.View>
                             ))}

@@ -85,7 +85,7 @@ app.post('/api/ai/roadmap', async (req, res) => {
     try {
         const { goal, currentSkills } = req.body;
         const roadmap = await aiService.generateRoadmap(goal, currentSkills || []);
-        res.json({ roadmap });
+        res.json(roadmap);
     } catch (error) {
         res.status(500).json({ error: 'Failed to generate roadmap' });
     }
@@ -112,6 +112,22 @@ app.post('/api/ai/stt', upload.single('audio'), async (req, res) => {
         // Clean up even on error
         if (req.file) fs.unlinkSync(req.file.path);
         res.status(500).json({ error: 'Failed to transcribe audio' });
+    }
+});
+
+/**
+ * Text-to-Speech Endpoint
+ */
+app.post('/api/ai/tts', async (req, res) => {
+    try {
+        const { text } = req.body;
+        console.log(`TTS Request received for text: "${text.substring(0, 30)}..."`);
+        const audioUri = await aiService.generateTTS(text);
+        console.log('TTS URI generated successfully, sending to client');
+        res.json({ audioUri });
+    } catch (error) {
+        console.error('TTS Endpoint Error:', error);
+        res.status(500).json({ error: 'Failed to generate speech' });
     }
 });
 

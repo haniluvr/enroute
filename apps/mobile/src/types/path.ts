@@ -11,6 +11,7 @@ export interface PathCard {
     lastUpdated: string;
     rating?: number;
     reviewCount?: number;
+    overview?: string;
     avatarUrls?: string[];
 }
 
