@@ -8,13 +8,24 @@ const ADZUNA_APP_KEY = process.env.ADZUNA_APP_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 export const ROLE_ROADMAPS = [
-    'frontend', 'backend', 'full-stack', 'devops', 'ux-design', 
-    'ai-engineer', 'data-analyst', 'software-architect', 'product-manager'
+    'frontend', 'backend', 'full-stack', 'devops', 'devsecops', 'data-analyst', 
+    'ai-engineer', 'ai-data-scientist', 'data-engineer', 'android', 'machine-learning', 
+    'postgresql-dba', 'ios', 'blockchain', 'qa', 'software-architect', 
+    'cyber-security', 'ux-design', 'technical-writer', 'game-developer', 
+    'server-side-game-developer', 'mlops', 'product-manager', 'engineering-manager', 
+    'developer-relations', 'bi-analyst'
 ];
 
 export const SKILL_ROADMAPS = [
-    'react', 'python', 'sql', 'javascript', 'docker', 'kubernetes', 
-    'aws', 'computer-science', 'api-design', 'data-structures-algorithms'
+    'sql', 'computer-science', 'react', 'vue', 'angular', 'javascript', 'typescript', 
+    'nodejs', 'python', 'system-design', 'java', 'aspnet-core', 'api-design', 
+    'spring-boot', 'flutter', 'cpp', 'rust', 'golang', 'software-design-architecture', 
+    'graphql', 'react-native', 'design-system', 'prompt-engineering', 'mongodb', 
+    'linux', 'kubernetes', 'docker', 'aws', 'terraform', 'data-structures-algorithms', 
+    'redis', 'git-github', 'php', 'cloudflare', 'ai-red-teaming', 'ai-agents', 
+    'nextjs', 'code-review', 'kotlin', 'html', 'css', 'swift', 'shell', 'laravel', 
+    'elasticsearch', 'wordpress', 'django', 'ruby', 'ruby-on-rails', 'claude-code', 
+    'vibe-coding', 'scala'
 ];
 
 export interface JobStats {
@@ -71,33 +82,28 @@ export const externalDataService = {
     /**
      * Fetch roadmap from roadmap.sh GitHub
      */
-    async getRoadmapModules(role: string): Promise<string[]> {
+    async getRoadmapModules(role: string): Promise<{ labels: string[], rawNodes: any[], rawEdges: any[] }> {
         try {
-            // Mapping common roles to roadmap.sh names
-            const roleMap: Record<string, string> = {
-                'frontend': 'frontend',
-                'backend': 'backend',
-                'data-analyst': 'data-analyst',
-                'software-engineer': 'computer-science', // Close enough?
-                'ui-ux-designer': 'ux-design',
-                'devops': 'devops'
-            };
-
-            const mappedRole = roleMap[role.toLowerCase().replace(/\s+/g, '-')] || role.toLowerCase();
+            const mappedRole = role.toLowerCase();
             const url = `https://raw.githubusercontent.com/kamranahmedse/developer-roadmap/master/src/data/roadmaps/${mappedRole}/${mappedRole}.json`;
             const response = await axios.get(url);
             
-            // Extract unique labels from nodes
             const nodes = response.data.nodes || [];
-            const labels = nodes
+            const edges = response.data.edges || [];
+            
+            // Extract unique labels from nodes map
+            const labelsMap = nodes
                 .map((n: any) => n.data?.label as string)
-                .filter((l: string) => l && l.length > 2 && !l.includes('node'))
-                .slice(0, 10); // Take top 10 for simplicity
+                .filter((l: string) => l && l.length > 2 && !l.includes('node'));
 
-            return [...new Set(labels)] as string[];
+            return {
+                labels: [...new Set(labelsMap)] as string[],
+                rawNodes: nodes,
+                rawEdges: edges
+            };
         } catch (error) {
             console.error('Roadmap.sh Fetch Error:', error);
-            return [];
+            return { labels: [], rawNodes: [], rawEdges: [] };
         }
     },
 

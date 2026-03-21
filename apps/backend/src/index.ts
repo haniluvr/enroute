@@ -94,6 +94,23 @@ app.post('/api/ai/roadmap', async (req, res) => {
 /**
  * Speech-to-Text (Transcribe) Endpoint
  */
+app.post('/api/ai/analyze-assessment', async (req, res) => {
+    try {
+        const { answers } = req.body;
+        if (!answers) return res.status(400).json({ error: 'No answers provided' });
+        
+        console.log(`Analyzing assessment...`);
+        const result = await aiService.analyzeAssessment(answers);
+        res.json(result);
+    } catch (error) {
+        console.error('Assessment Analyze Error:', error);
+        res.status(500).json({ error: 'Failed to analyze assessment' });
+    }
+});
+
+/**
+ * Speech-to-Text (Transcribe) Endpoint
+ */
 app.post('/api/ai/stt', upload.single('audio'), async (req, res) => {
     try {
         if (!req.file) {

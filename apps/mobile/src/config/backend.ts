@@ -10,4 +10,5 @@ export const AI_API = {
     PARSE_CV: `${BACKEND_URL}/api/ai/parse-cv`,
     STT: `${BACKEND_URL}/api/ai/stt`,
     TTS: `${BACKEND_URL}/api/ai/tts`,
+    ANALYZE_ASSESSMENT: `${BACKEND_URL}/api/ai/analyze-assessment`,
 };

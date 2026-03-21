@@ -39,8 +39,12 @@ Average Market Salary: ${stats.avgSalary}
 Market Demand: ${stats.jobDemand}`;
 
             // 4. Fetch Modules
-            const moduleTitles = await externalDataService.getRoadmapModules(role) as string[];
+            const { labels, rawNodes, rawEdges } = await externalDataService.getRoadmapModules(role);
+            const moduleTitles = labels.slice(0, 10);
             
+            const roadmapData = { nodes: rawNodes, edges: rawEdges };
+            const fullOverview = overview + `\n[ROADMAP]${JSON.stringify(roadmapData)}[/ROADMAP]`;
+
             // 5. Upsert Path
             const { data: existingPath } = await supabase
                 .from('learning_paths')
@@ -51,7 +55,7 @@ Market Demand: ${stats.jobDemand}`;
             let pathId: string;
             const pathPayload: any = {
                 title: role,
-                overview: overview,
+                overview: fullOverview,
                 reviews_avg: (4 + Math.random()).toFixed(1)
             };
 

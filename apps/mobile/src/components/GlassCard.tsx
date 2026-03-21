@@ -1,9 +1,10 @@
 import { View, ViewProps, StyleSheet } from 'react-native';
-import tw from '@/lib/tailwind';
+import tw from '@/lib/tailwind';import { ReactNode } from 'react';
 
 interface GlassCardProps extends ViewProps {
     intensity?: number;
     noPadding?: boolean;
+    children?: ReactNode;
 }
 
 export function GlassCard({ children, style, noPadding, ...props }: GlassCardProps) {

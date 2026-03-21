@@ -66,6 +66,47 @@ export const aiService = {
     },
 
     /**
+     * Analyze Career Aptitude Assessment
+     */
+    async analyzeAssessment(answers: Record<number, string>) {
+        try {
+            // Convert numerical keys to a readable format
+            const answersText = Object.entries(answers)
+                .map(([qId, ans]) => `Question ${qId}: ${ans}`)
+                .join('\n');
+
+            const prompt = `Analyze these career aptitude test answers from a user:\n\n${answersText}\n\nBased on these answers, write a single concise and encouraging paragraph (max 2 sentences) suggesting their perfect career match. Focus primarily on either Software Development (Frontend/Backend/FullStack), Design (UI/UX), Engineering (DevOps, Data, AI), or Architecture. Output ONLY the paragraph, nothing else. Start with "Based on your answers, "`;
+
+            const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
+                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                messages: [
+                    { role: 'system', content: 'You are an expert career profiler. Output ONLY the requested paragraph summary. Be highly encouraging and specific.' },
+                    { role: 'user', content: prompt }
+                ],
+                max_tokens: 150,
+                temperature: 0.7,
+            }, {
+                headers: { 'Authorization': `Bearer ${HF_API_KEY}` }
+            });
+
+            let content = response.data.choices[0].message.content.trim();
+            // Clean up any extra quotes or weird artifacts
+            content = content.replace(/^"|"$/g, '');
+            
+            // Generate a random confidence match percentage for realism
+            const matchPercentage = Math.floor(Math.random() * (98 - 85 + 1)) + 85; 
+
+            return {
+                suggestion: content,
+                matchPercentage
+            };
+        } catch (error: any) {
+            console.error('Assessment Analysis Error:', error?.response?.data || error.message);
+            throw error;
+        }
+    },
+
+    /**
      * Generate Career Roadmap (Grounded in real data)
      */
     async generateRoadmap(goal: string, currentSkills: string[]) {
@@ -83,7 +124,7 @@ export const aiService = {
             REAL-WORLD CONTEXT:
             Average Salary: ${stats.avgSalary}
             Job Demand: ${stats.jobDemand}
-            Base Curriculum Topics: ${baseModules.join(', ')}
+            Base Curriculum Topics: ${baseModules.labels.slice(0, 10).join(', ')}
             
             Generate a 4-step professional roadmap to reach this goal. 
             Ensure each step is practical and actionable. 

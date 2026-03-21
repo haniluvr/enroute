@@ -5,7 +5,7 @@ import { GlassCard } from '@/components/GlassCard';
 import { Link } from 'expo-router';
 import type { PathCard as PathCardType } from '@/types/path';
 import { pathIconMap } from './pathIconMap';
-import { parsePathMeta } from '@/utils/pathUtils';
+import { parsePathMeta, formatPathTitle } from '@/utils/pathUtils';
 
 interface PathCardResultProps {
     item: any;
@@ -53,8 +53,8 @@ export function PathCardResult({ item }: PathCardResultProps) {
                     </View>
                     
                     <View style={tw`flex-1`}>
-                        <Text style={tw`text-white font-[InterTight-SemiBold] text-base mb-1`} numberOfLines={1}>
-                            {item.title.charAt(0).toUpperCase() + item.title.slice(1).replace(/-/g, ' ')}
+                        <Text style={tw`text-white font-[InterTight] font-bold text-[17px] mb-2`} numberOfLines={1}>
+                            {formatPathTitle(item.title)}
                         </Text>
                         <View style={tw`flex-row`}>
                             <View style={tw`${meta.type === 'role' ? 'bg-blue-500/20' : 'bg-teal-500/20'} px-2 py-0.5 rounded-full border ${meta.type === 'role' ? 'border-blue-500/40' : 'border-teal-500/40'}`}>

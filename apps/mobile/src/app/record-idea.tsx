@@ -259,7 +259,7 @@ export default function RecordIdeaScreen() {
             );
 
             const interval = setInterval(() => {
-                setSeconds(s => s + 1);
+                setSeconds((s: number) => s + 1);
             }, 1000);
             return () => {
                 clearInterval(interval);
@@ -272,7 +272,7 @@ export default function RecordIdeaScreen() {
         if (state === 'PROCESSING') {
             setProcessingProgress(0);
             const interval = setInterval(() => {
-                setProcessingProgress(prev => {
+                setProcessingProgress((prev: number) => {
                     if (prev >= 98) return prev;
                     return prev + Math.floor(Math.random() * 5) + 1;
                 });
@@ -372,7 +372,7 @@ export default function RecordIdeaScreen() {
                 Audio.RecordingOptionsPresets.HIGH_QUALITY
             );
 
-            recording.setOnRecordingStatusUpdate((status) => {
+            recording.setOnRecordingStatusUpdate((status: any) => {
                 if (status.isRecording && status.metering !== undefined) {
                     metering.value = withTiming(status.metering, { duration: 100 });
                 }
@@ -530,7 +530,7 @@ export default function RecordIdeaScreen() {
                     content: data.response
                 });
             } else {
-                setMessages(prev => prev.filter(m => m.content !== 'Dahlia is analyzing your idea...'));
+                setMessages((prev: Message[]) => prev.filter((m: Message) => m.content !== 'Dahlia is analyzing your idea...'));
                 console.warn('AI returned empty response');
             }
         } catch (err: any) {
@@ -616,7 +616,7 @@ export default function RecordIdeaScreen() {
 
             // Save messages if any
             if (messages.length > 0) {
-                const messagesToInsert = messages.map(msg => ({
+                const messagesToInsert = messages.map((msg: Message) => ({
                     conversation_id: conversationId,
                     role: msg.role,
                     content: msg.content
@@ -664,16 +664,16 @@ export default function RecordIdeaScreen() {
     };
 
     const handleRegenerate = async (messageId: string) => {
-        const messageIndex = messages.findIndex(m => m.id === messageId);
+        const messageIndex = messages.findIndex((m: Message) => m.id === messageId);
         if (messageIndex === -1) return;
 
-        const history = messages.slice(0, messageIndex).map(m => ({
+        const history = messages.slice(0, messageIndex).map((m: Message) => ({
             role: m.role,
             content: m.content
         }));
 
         // Set updating state
-        setMessages(prev => prev.map(m => 
+        setMessages((prev: Message[]) => prev.map((m: Message) => 
             m.id === messageId ? { ...m, isUpdating: true } : m
         ));
 
@@ -688,7 +688,7 @@ export default function RecordIdeaScreen() {
             if (!response.ok) throw new Error('Regeneration failed');
             const data = await response.json();
 
-            setMessages(prev => prev.map(m => {
+            setMessages((prev: Message[]) => prev.map((m: Message) => {
                 if (m.id === messageId) {
                     const newVersions = [...(m.versions || [m.content]), data.response];
                     return {
@@ -703,7 +703,7 @@ export default function RecordIdeaScreen() {
             }));
         } catch (error) {
             console.error('Regeneration Error:', error);
-            setMessages(prev => prev.map(m => 
+            setMessages((prev: Message[]) => prev.map((m: Message) => 
                 m.id === messageId ? { ...m, isUpdating: false } : m
             ));
             Alert.alert("Error", "Could not regenerate response.");
@@ -711,7 +711,7 @@ export default function RecordIdeaScreen() {
     };
 
     const navigateVersion = (messageId: string, direction: 'prev' | 'next') => {
-        setMessages(prev => prev.map(m => {
+        setMessages((prev: Message[]) => prev.map((m: Message) => {
             if (m.id === messageId && m.versions) {
                 const newVersion = direction === 'prev' 
                     ? Math.max(0, (m.currentVersion || 0) - 1)
@@ -791,7 +791,7 @@ export default function RecordIdeaScreen() {
             
             currentSoundRef.current = sound;
 
-            sound.setOnPlaybackStatusUpdate(async (status) => {
+            sound.setOnPlaybackStatusUpdate(async (status: any) => {
                 if (status.isLoaded && status.didJustFinish) {
                     setIsSpeaking(null);
                     await sound.unloadAsync();
@@ -811,7 +811,7 @@ export default function RecordIdeaScreen() {
     };
 
     const handleFeedback = (messageId: string, type: 'positive' | 'negative') => {
-        setMessages(prev => prev.map(m => {
+        setMessages((prev: Message[]) => prev.map((m: Message) => {
             if (m.id === messageId) {
                 return { ...m, feedback: m.feedback === type ? null : type };
             }
@@ -829,7 +829,7 @@ export default function RecordIdeaScreen() {
             timestamp: new Date()
         };
 
-        setMessages(prev => [...prev, newMessage]);
+        setMessages((prev: Message[]) => [...prev, newMessage]);
         const currentInput = inputText;
         setInputText('');
         Keyboard.dismiss();
@@ -841,7 +841,7 @@ export default function RecordIdeaScreen() {
             content: 'Thinking...',
             timestamp: new Date()
         };
-        setMessages(prev => [...prev, thinkingMsg]);
+        setMessages((prev: Message[]) => [...prev, thinkingMsg]);
 
         try {
             await supabase.from('conversation_messages').insert({
@@ -856,7 +856,7 @@ export default function RecordIdeaScreen() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     persona: 'IdeaBot',
-                    history: messages.map(m => ({
+                    history: messages.map((m: Message) => ({
                         role: m.role,
                         content: m.content
                     })).concat([{ role: 'user', content: currentInput }])
@@ -867,8 +867,8 @@ export default function RecordIdeaScreen() {
 
             if (data.response) {
                 // Remove thinking message and add actual AI response
-                setMessages(prev => {
-                    const newMessages = prev.filter(msg => msg.content !== 'Thinking...');
+                setMessages((prev: Message[]) => {
+                    const newMessages = prev.filter((msg: Message) => msg.content !== 'Thinking...');
                     const aiResponse: Message = {
                         id: Math.random().toString(36).substr(2, 9),
                         role: 'assistant',
@@ -1126,7 +1126,7 @@ export default function RecordIdeaScreen() {
                             </View>
 
                             {/* Chat Messages */}
-                            {messages.map((msg, index) => (
+                            {messages.map((msg: Message, index: number) => (
                                 <Animated.View
                                     key={index}
                                     entering={FadeIn.delay(index * 100)}

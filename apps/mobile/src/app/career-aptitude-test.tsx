@@ -8,6 +8,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { CAREER_APTITUDE_QUESTIONS } from '@/data/career-aptitude-questions';
+import { AI_API } from '@/config/backend';
 
 type ScreenState = 'intro' | 'quiz' | 'result';
 
@@ -67,9 +68,24 @@ export default function CareerAptitudeTestScreen() {
         if (!user || user.id === 'pending') return;
         setIsSaving(true);
         try {
-            // Mock AI analysis for now
-            const aiSuggestion = "Based on your focus on product design and visual aesthetics, UI Architecture or Design Engineering would be a perfect fit.";
-            const matchPercentage = 88;
+            let aiSuggestion = "Based on your focus on product design and visual aesthetics, UI Architecture or Design Engineering would be a perfect fit.";
+            let matchPercentage = 88;
+
+            try {
+                const response = await fetch(AI_API.ANALYZE_ASSESSMENT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answers })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.suggestion) aiSuggestion = data.suggestion;
+                    if (data.matchPercentage) matchPercentage = data.matchPercentage;
+                }
+            } catch (aiErr) {
+                console.warn('AI assessment analysis failed, falling back:', aiErr);
+            }
 
             const { error } = await supabase
                 .from('career_assessments')
