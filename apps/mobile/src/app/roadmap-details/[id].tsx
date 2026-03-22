@@ -5,6 +5,7 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
+    ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, GraduationCap, Calendar, Download, FileText, Video, Wrench, Star, ChevronRight } from 'lucide-react-native';
@@ -12,7 +13,8 @@ import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import { careerDetailsMap } from '@/data/pathMockData';
 import { pathIconMap } from '@/components/path/pathIconMap';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/config/supabase';
 
 export default function RoadmapDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,7 +23,61 @@ export default function RoadmapDetailsScreen() {
 
     const career = id ? careerDetailsMap[id as keyof typeof careerDetailsMap] : null;
 
-    if (!career) {
+    const [dbStep, setDbStep] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (!id || career) {
+            setIsLoading(false);
+            return;
+        }
+
+        const fetchStep = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('roadmap_steps')
+                    .select('*, roadmaps(salary_range, demand_level, estimated_duration)')
+                    .eq('id', id)
+                    .single();
+
+                if (data) {
+                    setDbStep({
+                        title: data.title,
+                        description: data.description,
+                        learnItems: data.learn_items || [],
+                        jobDemand: data.roadmaps?.demand_level || 'Medium',
+                        avgSalary: data.roadmaps?.salary_range || 'Competitive',
+                        estTimeToComplete: data.roadmaps?.estimated_duration || '3-6 months',
+                        pdfs: [],
+                        videos: [],
+                        articles: [],
+                        reviews: [],
+                        icon: 'GraduationCap'
+                    });
+                }
+            } catch (err) {
+                console.error('Fetch step error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchStep();
+    }, [id, career]);
+
+    const displayData = career || dbStep;
+
+    if (isLoading) {
+        return (
+            <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
+                <SafeAreaView style={tw`flex-1 items-center justify-center`}>
+                    <ActivityIndicator color="#fff" size="large" />
+                </SafeAreaView>
+            </GlassBackground>
+        );
+    }
+
+    if (!displayData) {
         return (
             <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
                 <SafeAreaView style={tw`flex-1`}>
@@ -74,15 +130,18 @@ export default function RoadmapDetailsScreen() {
                             <View style={tw`bg-[#f43f5e]/20 px-3 py-1.5 rounded-full flex-row items-center border border-[#f43f5e]/60 mr-2`}>
                                 <GraduationCap color="#f43f5e" size={14} style={tw`mr-1.5`} />
                                 <Text style={tw`text-[#f43f5e] font-[InterTight-Medium] text-sm`}>
-                                    Course overview
+                                    Step overview
                                 </Text>
                             </View>
                         </View>
                         <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg mb-2`}>
-                            What you need to learn:
+                            {displayData.description}
+                        </Text>
+                        <Text style={tw`text-gray-300 font-[InterTight-SemiBold] text-base mb-2`}>
+                            What you'll learn in this step:
                         </Text>
                         <View style={tw`mb-4 pl-2`}>
-                            {career.learnItems.map((item, i) => (
+                            {displayData.learnItems.map((item: string, i: number) => (
                                 <Text key={i} style={tw`text-white font-[InterTight] text-lg mb-1`}>
                                     • {item}
                                 </Text>
@@ -92,19 +151,19 @@ export default function RoadmapDetailsScreen() {
                             <View style={tw`flex-row items-center mb-2`}>
                                 <GraduationCap color="#fcfcfc80" size={16} style={tw`mr-2`} />
                                 <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
-                                    Job Demand: {career.jobDemand}
+                                    Market Demand: {displayData.jobDemand}
                                 </Text>
                             </View>
                             <View style={tw`flex-row items-center mb-2`}>
-                                <IconComponent color="#fcfcfc80" size={16} style={tw`mr-2`} />
+                                <Star color="#fcfcfc80" size={16} style={tw`mr-2`} />
                                 <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
-                                    Avg Salary: {career.avgSalary}
+                                    Career Prospects: {displayData.avgSalary}
                                 </Text>
                             </View>
                             <View style={tw`flex-row items-center`}>
                                 <Calendar color="#fcfcfc80" size={16} style={tw`mr-2`} />
                                 <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
-                                    Est time to complete: {career.estTimeToComplete}
+                                    Est time for path: {displayData.estTimeToComplete}
                                 </Text>
                             </View>
                         </View>

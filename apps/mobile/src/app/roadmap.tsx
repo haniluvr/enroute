@@ -1,9 +1,9 @@
 import tw from '@/lib/tailwind';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, Alert, Share } from 'react-native';
 import { GlassBackground } from '@/components/GlassBackground';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Check, Download, BookmarkPlus, Clock, DollarSign, TrendingUp, ChevronRight, Bookmark, Share2, Calendar, Loader, Award, ExternalLink } from 'lucide-react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,6 +12,11 @@ import { AI_API } from '@/config/backend';
 const COMMON_SKILLS = [
     'JavaScript', 'Python', 'React', 'Node.js', 'SQL', 'Git', 'AWS', 'Docker', 'UI/UX Design', 'Agile', 'Figma', 'TypeScript'
 ];
+
+interface DetectedSkill {
+    name: string;
+    source: 'cv' | 'manual';
+}
 
 export default function RoadmapScreen() {
     const { user } = useAuth();
@@ -29,9 +34,84 @@ export default function RoadmapScreen() {
         );
     };
 
-    const handleGenerate = async () => {
-        if (!goal.trim() || !user || user.id === 'pending') {
-            Alert.alert("Goal required", "Please tell us what you want to learn.");
+    const { preSelectedSkills, autofill } = useLocalSearchParams<{ preSelectedSkills?: string, autofill?: string }>();
+
+    useEffect(() => {
+        if (!user || user.id === 'pending' || roadmapData) return;
+
+        const prefillFromPersonalization = async () => {
+            try {
+                let currentGoal = goal;
+
+                // If coming from Scan CV, use the skills passed via params
+                if (preSelectedSkills) {
+                    const paramsSkills = preSelectedSkills.split(',').filter(Boolean);
+                    setSelectedSkills(prev => Array.from(new Set([...prev, ...paramsSkills])));
+                }
+
+                // 1. Fetch Skills from CV scans (for general pre-fill)
+                const { data: scans } = await supabase
+                    .from('cv_scans')
+                    .select('extracted_skills')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
+
+                // 2. Fetch Goal suggestion from career assessment
+                const { data: assessments } = await supabase
+                    .from('career_assessments')
+                    .select('ai_career_suggestion')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (scans && scans.length > 0) {
+                    const allSkills = new Set<string>();
+                    // Only use the most recent scan to avoid overwhelming the UI
+                    const mostRecentScan = scans[0];
+                    const skills = mostRecentScan.extracted_skills;
+                    
+                    if (Array.isArray(skills)) {
+                        skills.forEach((skill: any) => allSkills.add(String(skill)));
+                    } else if (skills && typeof skills === 'object') {
+                        const tech = skills.technical || [];
+                        const soft = skills.soft || [];
+                        [...tech, ...soft].forEach(skill => allSkills.add(String(skill)));
+                    }
+                    
+                    if (allSkills.size > 0) {
+                        setSelectedSkills(prev => Array.from(new Set([...prev, ...Array.from(allSkills)])));
+                    }
+                }
+
+                if (assessments && assessments.length > 0 && !currentGoal) {
+                    currentGoal = assessments[0].ai_career_suggestion;
+                    setGoal(currentGoal);
+                }
+
+                // FALLBACK GOAL if autofill is true but no goal exists
+                if (autofill === 'true' && !currentGoal && preSelectedSkills) {
+                    const firstSkill = preSelectedSkills.split(',')[0] || 'Professional';
+                    currentGoal = `${firstSkill} Specialist`;
+                    setGoal(currentGoal);
+                }
+
+                // AUTO-TRIGGER GENERATE if autofill is true
+                if (autofill === 'true' && currentGoal && !isGenerating && !roadmapData) {
+                    // Small delay to ensure state updates
+                    setTimeout(() => handleGenerate(currentGoal), 500);
+                }
+            } catch (err) {
+                console.error('Personalization pre-fill error:', err);
+            }
+        };
+
+        prefillFromPersonalization();
+    }, [user, roadmapData, preSelectedSkills, autofill]);
+
+    const handleGenerate = async (overrideGoal?: string) => {
+        const targetGoal = overrideGoal || goal;
+        if (!targetGoal.trim() || !user || user.id === 'pending') {
+            if (!overrideGoal) Alert.alert("Goal required", "Please tell us what you want to learn.");
             return;
         }
         setIsGenerating(true);
@@ -42,7 +122,7 @@ export default function RoadmapScreen() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    goal,
+                    goal: targetGoal,
                     currentSkills: selectedSkills
                 })
             });
@@ -60,7 +140,7 @@ export default function RoadmapScreen() {
                 .from('roadmaps')
                 .insert({
                     user_id: user.id,
-                    goal: goal,
+                    goal: targetGoal,
                     estimated_duration: data.estimated_duration || '6-12 Months',
                     salary_range: data.salary || 'Competitive',
                     demand_level: data.demand || 'High',
@@ -80,7 +160,8 @@ export default function RoadmapScreen() {
                 educational_platform: step.platform || 'General',
                 has_certification: !!step.platform && step.platform.toLowerCase().includes('coursera'),
                 is_professional_cert: false,
-                order: index
+                order: index,
+                learn_items: step.learnItems || []
             }));
 
             const { data: savedSteps, error: stepsError } = await supabase
@@ -202,13 +283,14 @@ export default function RoadmapScreen() {
                             Select skills you currently have
                         </Text>
                         <View style={tw`flex-row flex-wrap gap-2`}>
+                            {/* Only show generalized common skills for selection to keep UI clean */}
                             {COMMON_SKILLS.map(skill => (
                                 <TouchableOpacity
                                     key={skill}
                                     onPress={() => toggleSkill(skill)}
-                                    style={tw`flex-row items-center bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl ${selectedSkills.includes(skill) ? 'border-white/20' : ''}`}
+                                    style={tw`flex-row items-center bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl ${selectedSkills.includes(skill) ? 'border-accent-pink bg-accent-pink/5' : ''}`}
                                 >
-                                    <View style={tw`w-5 h-5 rounded bg-white/10 mr-2 items-center justify-center border border-white/20 ${selectedSkills.includes(skill) ? 'border-white/10' : ''}`}>
+                                    <View style={tw`w-5 h-5 rounded bg-white/10 mr-2 items-center justify-center border border-white/20 ${selectedSkills.includes(skill) ? 'bg-accent-pink border-accent-pink' : ''}`}>
                                         {selectedSkills.includes(skill) && <Check color="#fff" size={12} />}
                                     </View>
                                     <Text style={tw`text-white font-[InterTight] text-[15px]`}>{skill}</Text>
@@ -299,7 +381,7 @@ export default function RoadmapScreen() {
             {!roadmapData ? (
                 <View style={tw`absolute bottom-0 left-0 right-0 px-6 pb-12 pt-4 bg-transparent`}>
                      <TouchableOpacity
-                        onPress={handleGenerate}
+                        onPress={() => handleGenerate()}
                         disabled={isGenerating}
                         style={tw`w-full py-4 rounded-full items-center justify-center flex-row shadow-xl ${isGenerating ? 'bg-white/70' : 'bg-white'}`}
                     >

@@ -8,6 +8,7 @@ import { GlassButton } from '@/components/GlassButton';
 import { useRouter, Link } from 'expo-router';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import * as Linking from 'expo-linking';
 
 // Mock Data for things not yet in Supabase
 const STATS = [
@@ -47,8 +48,88 @@ export default function ProfileScreen() {
     const [levelBadge, setLevelBadge] = useState('New User');
     const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&h=200&auto=format&fit=crop');
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isResending, setIsResending] = useState(false);
+    
+    // Real dynamic data states
+    const [stats, setStats] = useState(STATS);
+    const [skills, setSkills] = useState(SKILLS);
 
     const isVerified = user?.email_confirmed_at != null;
+
+    const handleResendVerification = async () => {
+        if (!user?.email || isResending) return;
+
+        setIsResending(true);
+        const redirectUrl = Linking.createURL('/profile');
+        console.log('[Profile] Attempting to resend verification email to:', user.email, 'with redirect:', redirectUrl);
+        
+        try {
+            // First try with the redirect URL
+            const { data, error } = await supabase.auth.resend({
+                type: 'signup',
+                email: user.email,
+                options: {
+                    emailRedirectTo: redirectUrl,
+                }
+            });
+
+            console.log('[Profile] Resend response:', { data, error });
+
+            if (error) {
+                // If the redirect URL is the problem (often due to Supabase allow-list), try without it
+                if (error.message.includes('redirect_uri') || error.message.includes('URL')) {
+                    console.log('[Profile] Redirect URL rejected, trying without it...');
+                    const { error: secondError } = await supabase.auth.resend({
+                        type: 'signup',
+                        email: user.email,
+                    });
+                    if (secondError) throw secondError;
+                    Alert.alert('Success', `Verification email resent to ${user.email}! (Please check your inbox)`);
+                } else if (error.status === 429) {
+                    Alert.alert('Too Many Requests', 'Please wait a minute before trying to resend the email again.');
+                } else {
+                    Alert.alert('Error', error.message);
+                }
+            } else {
+                Alert.alert('Success', `Verification email resent to ${user.email}! Please check your inbox (and spam folder).`);
+            }
+        } catch (err: any) {
+            console.error('[Profile] Resend Exception:', err);
+            Alert.alert('Error', err.message || 'An error occurred while resending the email.');
+        } finally {
+            setIsResending(false);
+        }
+    };
+
+    useEffect(() => {
+        const handleUrl = (url: string) => {
+            const { queryParams } = Linking.parse(url);
+            const fragment = url.includes('#') ? url.split('#')[1] : '';
+            const hashParams = fragment ? Linking.parse('?' + fragment).queryParams : {};
+            const allParams = { ...queryParams, ...hashParams };
+
+            if (allParams.error_code === 'otp_expired') {
+                Alert.alert(
+                    'Link Expired',
+                    'Your verification link has expired. Would you like us to send a new one?',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Resend Email', onPress: handleResendVerification }
+                    ]
+                );
+            }
+        };
+
+        const subscription = Linking.addEventListener('url', (event) => {
+            handleUrl(event.url);
+        });
+
+        Linking.getInitialURL().then(url => {
+            if (url) handleUrl(url);
+        });
+
+        return () => subscription.remove();
+    }, [user?.email, isResending]);
 
     useEffect(() => {
         if (user) {
@@ -69,10 +150,63 @@ export default function ProfileScreen() {
             if (metadata.avatar_url) {
                 setAvatar(metadata.avatar_url);
             }
+            fetchRealProfileData();
         } else {
             setDisplayName('Guest');
         }
     }, [user]);
+
+    const fetchRealProfileData = async () => {
+        if (!user || user.id === 'pending') return;
+        
+        try {
+            // 1. Fetch Latest Career Assessment for Top Match
+            const { data: assessments } = await supabase
+                .from('career_assessments')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1);
+            
+            // 2. Fetch CV Scans for Skills
+            const { data: scans } = await supabase
+                .from('cv_scans')
+                .select('extracted_skills')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            // Update Stats
+            setStats(prev => {
+                const newStats = [...prev];
+                if (assessments && assessments.length > 0) {
+                    newStats[0] = { ...newStats[0], value: `${assessments[0].match_percentage}%` };
+                }
+                return newStats;
+            });
+
+            // Aggregate skills from all CV scans
+            if (scans && scans.length > 0) {
+                const allSkills: string[] = [];
+                scans.forEach(s => {
+                    if (Array.isArray(s.extracted_skills)) {
+                        allSkills.push(...s.extracted_skills);
+                    }
+                });
+                
+                // Unique skills with mock progress for UI (until we have real progress tracking)
+                const uniqueSkills = Array.from(new Set(allSkills));
+                const formattedSkills = uniqueSkills.map((name, idx) => ({
+                    id: String(idx + 1),
+                    name,
+                    progress: Math.floor(Math.random() * 40) + 60 // Mocking some proficiency for viz
+                })).sort((a,b) => b.progress - a.progress);
+                
+                if (formattedSkills.length > 0) setSkills(formattedSkills);
+            }
+        } catch (err) {
+            console.error('Error fetching real profile data:', err);
+        }
+    };
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -80,26 +214,12 @@ export default function ProfileScreen() {
         setIsRefreshing(false);
     };
 
-    const handleResendVerification = async () => {
-        if (!user?.email) return;
-        const { error } = await supabase.auth.resend({
-            type: 'signup',
-            email: user.email,
-        });
-        if (error) {
-            Alert.alert('Error', error.message);
-        } else {
-            Alert.alert('Success', 'Verification email resent!');
-        }
-    };
-
     const handleSignOut = async () => {
         await supabase.auth.signOut();
         router.replace('/(auth)/sign-in');
     };
 
-    const displayedSkills = SKILLS.slice(0, 4);
-    const hasMoreSkills = SKILLS.length > 4;
+    const hasMoreSkills = skills.length > 4;
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
@@ -170,7 +290,7 @@ export default function ProfileScreen() {
 
                         {/* Stats Row (3 equal columns) */}
                         <View style={tw`flex-row justify-between w-full`}>
-                            {STATS.map((stat, idx) => (
+                            {stats.map((stat, idx) => (
                                 <View key={idx} style={tw`items-center flex-1`}>
                                     <View style={tw`flex-row items-center mb-1`}>
                                         <stat.icon size={16} color="#fff" style={tw`mr-1.5 opacity-60`} />
@@ -199,9 +319,13 @@ export default function ProfileScreen() {
                                     <View style={tw`flex-row gap-3`}>
                                         <TouchableOpacity
                                             onPress={handleResendVerification}
-                                            style={tw`bg-white/10 px-4 py-2 rounded-lg border border-white/10`}
+                                            disabled={isResending}
+                                            style={tw`bg-white/10 px-4 py-2 rounded-lg border border-white/10 flex-row items-center`}
                                         >
-                                            <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>Resend Email</Text>
+                                            {isResending && <RefreshCw color="#fff" size={12} style={[tw`mr-2`, { transform: [{ rotate: '45deg' }] }]} />}
+                                            <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>
+                                                {isResending ? 'Resending...' : 'Resend Email'}
+                                            </Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={handleRefresh}
@@ -230,7 +354,7 @@ export default function ProfileScreen() {
                             )}
                         </View>
 
-                        {displayedSkills.map((skill, index) => (
+                        {skills.slice(0, 4).map((skill, index) => (
                             <View key={skill.id} style={tw`${index !== 0 ? 'mt-6' : ''}`}>
                                 <View style={tw`flex-row justify-between items-center mb-2.5`}>
                                     <Text style={tw`text-white/90 text-base font-[InterTight-Medium]`}>{skill.name}</Text>

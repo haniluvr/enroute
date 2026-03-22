@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import {
     ChevronLeft,
     Search,
@@ -15,53 +15,63 @@ import {
     Trash2
 } from 'lucide-react-native';
 
-const CATEGORY_MAP: Record<string, { name: string; icon: any; items: any[] }> = {
-    ideas: {
-        name: 'Recorded Ideas',
-        icon: Mic,
-        items: [
-            { id: 101, title: "Voice Idea: App Concept", subtitle: "Recorded yesterday", type: "idea" },
-            { id: 102, title: "Career Vision 2026", subtitle: "Recorded 3 days ago", type: "idea" },
-            { id: 103, title: "Interview Prep Notes", subtitle: "Recorded last week", type: "idea" },
-        ]
-    },
-    roadmaps: {
-        name: 'My Roadmaps',
-        icon: MapPin,
-        items: [
-            { id: 201, title: "UI/UX Design Roadmap", subtitle: "Updated 2 days ago", type: "roadmap" },
-            { id: 202, title: "Frontend Mastery Path", subtitle: "Updated 1 week ago", type: "roadmap" },
-            { id: 203, title: "Product Management Guide", subtitle: "Started 2 weeks ago", type: "roadmap" },
-        ]
-    },
-    resources: {
-        name: 'Resources',
-        icon: Download,
-        items: [
-            { id: 301, title: "Product Management 101", subtitle: "Downloaded Resource", type: "resource" },
-            { id: 302, title: "Resume Templates Pack", subtitle: "Saved Resource", type: "resource" },
-            { id: 303, title: "System Design Cheat Sheet", subtitle: "Downloaded Resource", type: "resource" },
-        ]
-    },
-    conversations: {
-        name: 'Conversations',
-        icon: MessageSquare,
-        items: [
-            { id: 401, title: "Dahlia Conversation", subtitle: "Career advice session", type: "conversation" },
-            { id: 402, title: "Session with Marcus", subtitle: "Resume review", type: "conversation" },
-            { id: 403, title: "Mock Interview #1", subtitle: "Technical round", type: "conversation" },
-        ]
-    }
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/hooks/useAuth';
+
+const CATEGORY_INFO: Record<string, { name: string; icon: any; type: string }> = {
+    ideas: { name: 'Recorded Ideas', icon: Mic, type: 'idea' },
+    roadmaps: { name: 'My Roadmaps', icon: MapPin, type: 'roadmap' },
+    resources: { name: 'Resources', icon: Download, type: 'module' },
+    conversations: { name: 'Conversations', icon: MessageSquare, type: 'conversation' }
 };
 
 export default function LibraryCategoryScreen() {
+    const { user } = useAuth();
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
-    const category = CATEGORY_MAP[id as string] || CATEGORY_MAP['ideas'];
+    const categoryInfo = CATEGORY_INFO[id as string] || CATEGORY_INFO['ideas'];
     
-    const [items, setItems] = React.useState(category.items);
+    const [items, setItems] = React.useState<any[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
 
-    const handleDelete = (itemId: number) => {
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchCategoryItems();
+        }, [id, user])
+    );
+
+    const fetchCategoryItems = async () => {
+        if (!user || !id) return;
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('library_saves')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('item_type', categoryInfo.type)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            
+            const transformedItems = data.map(item => ({
+                id: item.id,
+                itemId: item.item_id,
+                title: item.title || `${categoryInfo.name.slice(0, -1)}`,
+                subtitle: (item.item_type === 'idea' || item.item_type === 'conversation') 
+                    ? `Last modified: ${new Date(item.created_at).toLocaleDateString()} at ${new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                    : `Saved ${new Date(item.created_at).toLocaleDateString()}`,
+                type: item.item_type
+            }));
+
+            setItems(transformedItems);
+        } catch (err) {
+            console.error('Fetch Category Error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
         Alert.alert(
             "Delete Item",
             "Are you sure you want to remove this item from your library?",
@@ -69,7 +79,19 @@ export default function LibraryCategoryScreen() {
                 { text: "Cancel", style: "cancel" },
                 { 
                     text: "Delete", 
-                    onPress: () => setItems(prev => prev.filter(item => item.id !== itemId)),
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('library_saves')
+                                .delete()
+                                .eq('id', id);
+                            
+                            if (error) throw error;
+                            setItems(prev => prev.filter(item => item.id !== id));
+                        } catch (err) {
+                            console.error('Delete Item Error:', err);
+                        }
+                    },
                     style: "destructive" 
                 }
             ]
@@ -82,14 +104,12 @@ export default function LibraryCategoryScreen() {
             style={tw`mb-4`} 
             key={item.id}
             onPress={() => {
-                if (item.type === 'roadmap') router.push(`/roadmap-details/${item.id}`);
-                else if (item.type === 'conversation') router.push('/(tabs)/dahlia');
-                else if (item.type === 'idea') router.push('/record-idea');
-                // For resources, we could link to a preview or just show an alert for now
+                if (item.type === 'roadmap') router.push(`/roadmap-details/${item.itemId}`);
+                else if (item.type === 'conversation' || item.type === 'idea') router.push({ pathname: '/record-idea', params: { id: item.itemId } });
                 else Alert.alert("Coming soon", "This feature is being developed.");
             }}
         >
-            <GlassCard style={tw`p-5 bg-[#1C1C1E]/80 border-t border-white/10`} noPadding>
+            <GlassCard style={tw`p-5 bg-white/5 border-t border-white/10`} noPadding>
                 <View style={tw`flex-row justify-between items-center`}>
                     <View style={tw`flex-1`}>
                         <Text style={tw`text-white font-[InterTight-Medium] text-[15px] mb-1`}>{item.title}</Text>
@@ -123,7 +143,7 @@ export default function LibraryCategoryScreen() {
                         <ChevronLeft color="#fff" size={24} />
                     </TouchableOpacity>
                     <View>
-                        <Text style={tw`text-white font-[InterTight] font-semibold text-2xl`}>{category.name}</Text>
+                        <Text style={tw`text-white font-[InterTight] font-semibold text-2xl`}>{categoryInfo.name}</Text>
                         <Text style={tw`text-white/40 font-[InterTight] text-sm mt-0.5`}>{items.length} items</Text>
                     </View>
                 </View>
@@ -134,7 +154,7 @@ export default function LibraryCategoryScreen() {
                         <Search color="#fff" size={20} style={tw`mr-3 opacity-80`} />
                         <TextInput
                             style={[tw`flex-1 text-white font-[InterTight] text-[15px] py-3.5`, { lineHeight: undefined }]}
-                            placeholder={`Search ${category.name.toLowerCase()}...`}
+                            placeholder={`Search ${categoryInfo.name.toLowerCase()}...`}
                             placeholderTextColor="rgba(255, 255, 255, 0.5)"
                             textAlignVertical="center"
                         />
@@ -143,11 +163,15 @@ export default function LibraryCategoryScreen() {
 
                 {/* Content */}
                 <View style={tw`px-6`}>
-                    {items.length === 0 ? (
+                    {isLoading ? (
                         <View style={tw`py-20 items-center`}>
-                            <category.icon color="rgba(255,255,255,0.1)" size={64} style={tw`mb-4`} />
+                            <ActivityIndicator color="#fff" />
+                        </View>
+                    ) : items.length === 0 ? (
+                        <View style={tw`py-20 items-center`}>
+                            <categoryInfo.icon color="rgba(255,255,255,0.1)" size={64} style={tw`mb-4`} />
                             <Text style={tw`text-gray-500 font-[InterTight] text-center`}>
-                                No {category.name.toLowerCase()} saved yet.
+                                No {categoryInfo.name.toLowerCase()} saved yet.
                             </Text>
                         </View>
                     ) : (

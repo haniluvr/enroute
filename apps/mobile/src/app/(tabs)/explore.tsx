@@ -23,14 +23,28 @@ export default function ExploreScreen() {
         if (!user || user.id === 'pending') return;
         setIsLoading(true);
         try {
-            // 1. Check if user has taken the test
+            // 1. Fetch Latest Career Assessment & CV Skills for Context
             const { data: assessments } = await supabase
                 .from('career_assessments')
-                .select('id')
+                .select('*')
                 .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
                 .limit(1);
             
             setHasTakenTest((assessments?.length || 0) > 0);
+            const userSuggestion = assessments?.[0]?.ai_career_suggestion?.toLowerCase() || '';
+
+            const { data: scans } = await supabase
+                .from('cv_scans')
+                .select('extracted_skills')
+                .eq('user_id', user.id);
+            
+            const userSkills = new Set<string>();
+            scans?.forEach(s => {
+                if (Array.isArray(s.extracted_skills)) {
+                    s.extracted_skills.forEach(skill => userSkills.add(String(skill).toLowerCase()));
+                }
+            });
 
             // 2. Get swiped job IDs
             const { data: swipes } = await supabase
@@ -50,23 +64,43 @@ export default function ExploreScreen() {
                 query = query.not('id', 'in', `(${swipedIds.join(',')})`);
             }
 
-            const { data: jobsData, error } = await query.limit(10);
-
+            const { data: jobsData, error } = await query.limit(20);
             if (error) throw error;
 
-            const formattedJobs: CareerCardData[] = (jobsData || []).map(j => ({
-                id: j.id,
-                company: j.company_name,
-                location: j.location,
-                role: j.role_title,
-                description: j.description || '',
-                matchPercentage: 0, 
-                skills: j.required_skills || [],
-                salary: j.salary_range || 'Competitive',
-                color: '#a78bfa'
-            }));
+            // 4. Transform and calculate matches
+            const formattedJobs: CareerCardData[] = (jobsData || []).map(j => {
+                const jobRole = j.role_title?.toLowerCase() || '';
+                const jobSkills = j.required_skills?.map((s: string) => s.toLowerCase()) || [];
+                
+                // Real matching logic
+                let baseMatch = 40; // Base random/neutral
+                
+                // Role match (e.g. "Software Engineer" matches "Software")
+                if (userSuggestion && (jobRole.includes(userSuggestion) || userSuggestion.includes(jobRole))) {
+                    baseMatch += 40;
+                }
+                
+                // Skills match
+                const matchingSkills = jobSkills.filter((s: string) => userSkills.has(s));
+                if (jobSkills.length > 0) {
+                    baseMatch += (matchingSkills.length / jobSkills.length) * 20;
+                }
 
-            setJobs(formattedJobs);
+                return {
+                    id: j.id,
+                    company: j.company_name,
+                    location: j.location,
+                    role: j.role_title,
+                    description: j.description || '',
+                    matchPercentage: Math.min(Math.round(baseMatch), 99), 
+                    skills: j.required_skills || [],
+                    salary: j.salary_range || 'Competitive',
+                    color: '#a78bfa'
+                };
+            });
+
+            // Sort by match percentage
+            setJobs(formattedJobs.sort((a,b) => b.matchPercentage - a.matchPercentage));
         } catch (err) {
             console.error('Fetch Jobs Error:', err);
         } finally {

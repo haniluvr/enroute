@@ -36,6 +36,8 @@ import { AI_API } from '@/config/backend';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -73,6 +75,52 @@ const MenuItem = ({ label, icon: Icon, onPress, isLast, isDestructive }: MenuIte
     </TouchableOpacity>
 );
 
+const SkillSection = ({ title, skills }: { title: string, skills: string[] }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    if (!skills || !Array.isArray(skills) || skills.length === 0) return null;
+
+    const visibleSkills = isExpanded ? skills : skills.slice(0, 5);
+    const remainingCount = skills.length - 5;
+
+    return (
+        <View style={tw`mb-8`}>
+            <View style={tw`flex-row items-center mb-4`}>
+                <View style={tw`px-3 py-1 bg-white/10 rounded-lg border border-white/20 mr-3`}>
+                    <Text style={tw`text-white/60 font-[InterTight] font-medium text-xs uppercase tracking-wider`}>{title}</Text>
+                </View>
+                <View style={tw`h-[1px] flex-1 bg-white/5`} />
+            </View>
+            <View style={tw`flex-row flex-wrap gap-2`}>
+                {visibleSkills.map((skill, idx) => (
+                    <Animated.View 
+                        key={`${skill}-${idx}`}
+                        entering={FadeIn.delay(idx * 50)}
+                        style={tw`bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl`}
+                    >
+                        <Text style={tw`text-white font-[InterTight] text-[15px]`}>{skill}</Text>
+                    </Animated.View>
+                ))}
+                {!isExpanded && remainingCount > 0 && (
+                    <TouchableOpacity 
+                        onPress={() => setIsExpanded(true)}
+                        style={tw`bg-white/10 border border-white/20 px-4 py-2.5 rounded-xl items-center justify-center`}
+                    >
+                        <Text style={tw`text-white font-[InterTight-SemiBold] text-[15px]`}>+{remainingCount} skills</Text>
+                    </TouchableOpacity>
+                )}
+                {isExpanded && remainingCount > 0 && (
+                    <TouchableOpacity 
+                        onPress={() => setIsExpanded(false)}
+                        style={tw`bg-white/10 border border-white/20 px-4 py-2.5 rounded-xl items-center justify-center`}
+                    >
+                        <Text style={tw`text-white font-[InterTight-SemiBold] text-[15px] opacity-60`}>Show less</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        </View>
+    );
+};
+
 export default function ScanCVScreen() {
     const { user } = useAuth();
     const router = useRouter();
@@ -89,7 +137,7 @@ export default function ScanCVScreen() {
     const [zoom, setZoom] = useState(0.1); // Default: Zoomed in slightly (label 0.5)
     const [isAnalyzed, setIsAnalyzed] = useState(false);
     const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [capturedImages, setCapturedImages] = useState<string[]>([]);
     const [sourceType, setSourceType] = useState<'CAMERA' | 'GALLERY' | 'FILE' | null>(null);
     const [selectedFile, setSelectedFile] = useState<{ uri: string; name: string; isPdf: boolean } | null>(null);
 
@@ -148,73 +196,116 @@ export default function ScanCVScreen() {
     };
 
     const takePicture = async () => {
-        // In a real app: const photo = await cameraRef.current?.takePictureAsync();
-        setCapturedImage('https://images.unsplash.com/photo-1586281380349-632531db7ed4?q=80&w=2070');
-        setSourceType('CAMERA');
-        setSelectedFile(null);
-        setState('ANALYZING');
+        if (!cameraRef.current) return;
+        try {
+            const photo = await cameraRef.current.takePictureAsync({
+                quality: 0.8,
+            });
+
+            if (photo && photo.uri) {
+                setCapturedImages(prev => [...prev, photo.uri]);
+                setSourceType('CAMERA');
+                setSelectedFile(null);
+                // We don't trigger upload immediately anymore, user can take more photos
+            }
+        } catch (err) {
+            console.error('Take Picture Error:', err);
+            Alert.alert("Error", "Could not capture photo.");
+        }
     };
 
-    const uploadCV = async (uri: string, name: string, type: string) => {
+    const uploadCV = async (uris: string | string[], names: string | string[], types: string | string[]) => {
         if (!user || user.id === 'pending') return;
         setIsUploading(true);
+        setState('UPLOADING');
         try {
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            const fileName = `${user.id}/${Date.now()}_${name}`;
+            const uriArray = Array.isArray(uris) ? uris : [uris];
+            const nameArray = Array.isArray(names) ? names : [names];
+            const typeArray = Array.isArray(types) ? types : [types];
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('cv_uploads')
-                .upload(fileName, blob, { contentType: type });
+            console.log(`[CV Scanner] Starting upload for ${uriArray.length} files`);
+            
+            const publicUrls: string[] = [];
 
-            if (uploadError) throw uploadError;
+            for (let i = 0; i < uriArray.length; i++) {
+                const uri = uriArray[i];
+                const name = nameArray[i] || `file_${Date.now()}_${i}`;
+                const type = typeArray[i] || 'image/jpeg';
 
-            if (uploadError) throw uploadError;
+                // 1. Read file as base64
+                const base64 = await FileSystem.readAsStringAsync(uri, {
+                    encoding: 'base64',
+                });
+                const arrayBuffer = decode(base64);
+                
+                const fileName = `${user.id}/${Date.now()}_${name}`;
+                console.log(`[CV Scanner] Uploading ${i+1}/${uriArray.length} to Supabase:`, fileName);
 
-            const { data: { publicUrl } } = supabase.storage
-                .from('cv_uploads')
-                .getPublicUrl(fileName);
+                // 2. Upload ArrayBuffer
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('cv_uploads')
+                    .upload(fileName, arrayBuffer, { 
+                        contentType: type,
+                        upsert: false 
+                    });
 
-            // In a real app, we would use an OCR service here.
-            // For now, we'll send a descriptive text to the AI to "simulate" OCR results.
-            const mockOcrText = `Professional Resume of ${user.email}. High proficiency in React, Node.js and API development. Interested in Backend engineering.`;
+                if (uploadError) {
+                    console.error('[CV Scanner] Supabase Storage Error:', uploadError);
+                    throw new Error(`Storage Error: ${uploadError.message}`);
+                }
 
-            // Call Backend AI to Parse CV
+                const { data: { publicUrl } } = supabase.storage
+                    .from('cv_uploads')
+                    .getPublicUrl(fileName);
+                
+                publicUrls.push(publicUrl);
+            }
+
+            console.log('[CV Scanner] All files uploaded. Public URLs:', publicUrls);
+            
             const aiResponse = await fetch(AI_API.PARSE_CV, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: mockOcrText })
+                body: JSON.stringify({ 
+                    fileUrl: publicUrls.length === 1 ? publicUrls[0] : publicUrls, 
+                    fileType: typeArray[0] // Assuming same type for all pages if images
+                })
             });
 
+            if (!aiResponse.ok) {
+                const errData = await aiResponse.json();
+                throw new Error(`AI Service Error: ${errData.error || 'Unknown'}`);
+            }
+
             const aiData = await aiResponse.json();
-            const detected_skills = aiData.skills || ['General Development'];
-            const suggested_skills = ['System Architecture', 'Security', 'Scalability'];
+            const extracted_skills = aiData.skills || [];
+            const missing_skills = aiData.suggestedSkills || [];
 
             const { data: scanData, error: scanError } = await supabase
                 .from('cv_scans')
                 .insert({
                     user_id: user.id,
-                    file_url: publicUrl,
-                    detected_skills,
-                    suggested_skills,
-                    analysis_result: {
-                        score: 85,
-                        feedback: "AI has successfully parsed your experience. Skills like " + detected_skills.slice(0, 2).join(', ') + " were found."
-                    }
+                    file_url: publicUrls[0], // Store primary URL (first page)
+                    extracted_skills,
+                    missing_skills
                 })
                 .select()
                 .single();
 
             if (scanError) throw scanError;
 
+            setScanResult(scanData);
             setState('RESULT');
-        } catch (err) {
+        } catch (err: any) {
             console.error('CV Upload Error:', err);
-            Alert.alert("Error", "Failed to upload and analyze CV.");
+            Alert.alert("Upload Error", err.message || "Failed to upload and analyze CV.");
+            setState('INTRO');
         } finally {
             setIsUploading(false);
         }
     };
+
+    const [scanResult, setScanResult] = useState<any>(null);
 
     const handleFileUpload = async (source: 'photos' | 'camera' | 'files') => {
         setPickerType(null);
@@ -229,21 +320,39 @@ export default function ScanCVScreen() {
                 } else if (source === 'photos') {
                     result = await ImagePicker.launchImageLibraryAsync({
                         mediaTypes: ['images'],
-                        allowsEditing: true,
-                        aspect: [5, 7],
+                        allowsEditing: false, 
                         quality: 0.8,
+                        allowsMultipleSelection: true,
                     });
                 } else if (source === 'files') {
                     result = await DocumentPicker.getDocumentAsync({
                         type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
                         copyToCacheDirectory: true,
+                        multiple: false, // Keep file upload to single for now as PDF parsing logic handles one
                     });
                 }
 
                 if (result && !result.canceled && result.assets && result.assets.length > 0) {
-                    const asset = result.assets[0];
-                    setState('UPLOADING');
-                    await uploadCV(asset.uri, asset.name || `cv_${Date.now()}`, asset.mimeType || 'application/octet-stream');
+                    if (source === 'photos') {
+                        const uris = result.assets.map((a: any) => a.uri);
+                        const names = result.assets.map((a: any) => a.fileName || `cv_page_${Date.now()}.jpg`);
+                        const types = result.assets.map((a: any) => a.mimeType || 'image/jpeg');
+                        
+                        setCapturedImages(uris);
+                        setSourceType('GALLERY');
+                        setSelectedFile(null);
+                        await uploadCV(uris, names, types);
+                    } else if (source === 'files') {
+                        const asset = result.assets[0];
+                        setCapturedImages([]);
+                        setSourceType('FILE');
+                        setSelectedFile({
+                            uri: asset.uri,
+                            name: asset.name || 'document.pdf',
+                            isPdf: asset.mimeType === 'application/pdf' || asset.name?.toLowerCase().endsWith('.pdf') || false
+                        });
+                        await uploadCV(asset.uri, asset.name || `cv_${Date.now()}`, asset.mimeType || 'application/octet-stream');
+                    }
                 }
             } catch (err) {
                 console.error(err);
@@ -333,17 +442,42 @@ export default function ScanCVScreen() {
                                         </View>
                                     </View>
                                 </View>
+                                {capturedImages.length > 0 && (
+                                    <View style={tw`absolute bottom-24 left-0 right-0 h-20 px-4`}>
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tw`items-center gap-2`}>
+                                            {capturedImages.map((uri, idx) => (
+                                                <View key={idx} style={tw`w-16 h-16 rounded-lg bg-black/40 border border-white/20 overflow-hidden`}>
+                                                    <Image source={{ uri }} style={tw`w-full h-full`} />
+                                                    <TouchableOpacity 
+                                                        onPress={() => setCapturedImages(prev => prev.filter((_, i) => i !== idx))}
+                                                        style={tw`absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 items-center justify-center`}
+                                                    >
+                                                        <X color="#fff" size={12} />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
                             </View>
                         ) : (
                             <View style={tw`w-full h-full bg-white/5`}>
-                                {capturedImage ? (
-                                    <View style={tw`flex-1 w-full h-full bg-[#1a1a1a] items-center justify-center`}>
-                                        <Image
-                                            key={capturedImage}
-                                            source={{ uri: capturedImage }}
-                                            style={StyleSheet.absoluteFill}
-                                            resizeMode="contain"
-                                        />
+                                {capturedImages.length > 0 ? (
+                                    <View style={tw`flex-1 w-full h-full bg-[#1a1a1a]`}>
+                                        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={tw`flex-1`}>
+                                            {capturedImages.map((uri, idx) => (
+                                                <View key={idx} style={{ width: width - 48, height: 420, alignItems: 'center', justifyContent: 'center' }}>
+                                                    <Image
+                                                        source={{ uri }}
+                                                        style={tw`w-full h-full`}
+                                                        resizeMode="contain"
+                                                    />
+                                                    <View style={tw`absolute top-4 left-4 bg-black/40 px-3 py-1 rounded-full border border-white/10`}>
+                                                        <Text style={tw`text-white text-xs`}>Page {idx + 1} of {capturedImages.length}</Text>
+                                                    </View>
+                                                </View>
+                                            ))}
+                                        </ScrollView>
                                         {selectedFile?.isPdf && (
                                             <View style={tw`absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md p-3 rounded-2xl border border-white/10 flex-row items-center`}>
                                                 <View style={tw`w-10 h-10 bg-red-500 rounded-lg items-center justify-center mr-3`}>
@@ -424,29 +558,30 @@ export default function ScanCVScreen() {
 
                     {state === 'RESULT' && (
                         <Animated.View entering={FadeIn}>
-                            <Text style={tw`text-white/60 font-[InterTight] font-medium text-xl mb-4`}>Skills detected in your resume</Text>
-                            <View style={tw`flex-row flex-wrap gap-2 mb-8`}>
-                                {['Javascript dev', 'API Integration', 'React framework', 'UI/UX Design'].map(skill => (
-                                    <View key={skill} style={tw`bg-white/5 border border-white/10 px-4 py-3 rounded-xl`}>
-                                        <Text style={tw`text-white font-[InterTight] text-[15px]`}>{skill}</Text>
-                                    </View>
-                                ))}
-                            </View>
+                            <SkillSection 
+                                title="Technical skills" 
+                                skills={Array.isArray(scanResult?.extracted_skills) ? scanResult.extracted_skills : scanResult?.extracted_skills?.technical || []} 
+                            />
+                            
+                            <SkillSection 
+                                title="Soft skills" 
+                                skills={scanResult?.extracted_skills?.soft || []} 
+                            />
 
                             <Text style={tw`text-white/60 font-[InterTight] font-medium text-xl mb-4`}>Missing or suggested skills</Text>
                             <View style={tw`flex-row flex-wrap gap-2 mb-8`}>
-                                {['Version control', 'SEO', 'Technical writing', 'Git & Github'].map(skill => (
-                                    <TouchableOpacity
-                                        key={skill}
-                                        onPress={() => toggleSkill(skill)}
-                                        style={tw`flex-row items-center bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl ${selectedSkills.includes(skill) ? 'border-accent-pink bg-accent-pink/10' : ''}`}
-                                    >
-                                        <View style={tw`w-5 h-5 rounded bg-white/10 mr-2 items-center justify-center border border-white/20 ${selectedSkills.includes(skill) ? 'bg-accent-pink border-accent-pink' : ''}`}>
-                                            {selectedSkills.includes(skill) && <Check color="#fff" size={12} />}
-                                        </View>
-                                        <Text style={tw`text-white font-[InterTight] text-[15px]`}>{skill}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                                {(scanResult?.missing_skills || ['Customizing...']).map((skill: any) => (
+                                     <TouchableOpacity
+                                         key={skill}
+                                         onPress={() => toggleSkill(skill)}
+                                         style={tw`flex-row items-center bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl ${selectedSkills.includes(skill) ? 'border-accent-pink bg-accent-pink/10' : ''}`}
+                                     >
+                                         <View style={tw`w-5 h-5 rounded bg-white/10 mr-2 items-center justify-center border border-white/20 ${selectedSkills.includes(skill) ? 'bg-accent-pink border-accent-pink' : ''}`}>
+                                             {selectedSkills.includes(skill) && <Check color="#fff" size={12} />}
+                                         </View>
+                                         <Text style={tw`text-white font-[InterTight] text-[15px]`}>{skill}</Text>
+                                     </TouchableOpacity>
+                                 ))}
                             </View>
 
                             <View style={tw`bg-white/5 p-4 rounded-2xl flex-row items-start mb-10`}>
@@ -482,32 +617,44 @@ export default function ScanCVScreen() {
                 )}
 
                 {state === 'CAMERA' && (
-                    <View style={tw`bg-white/10 backdrop-blur-md rounded-full px-6 py-4 flex-row items-center justify-between border border-white/20`}>
-                        <TouchableOpacity
-                            onPress={() => setZoom(zoom === 0.1 ? 0 : 0.1)}
-                            style={tw`w-10 h-10 rounded-full bg-white/10 items-center justify-center`}
-                        >
-                            <Text style={tw`text-white font-bold text-xs`}>{zoom === 0.1 ? '0.5' : '1.0'}</Text>
-                        </TouchableOpacity>
+                    <View style={tw`gap-4`}>
+                        {capturedImages.length > 0 && (
+                            <TouchableOpacity
+                                onPress={() => uploadCV(capturedImages, capturedImages.map((_, i) => `page_${i}.jpg`), capturedImages.map(() => 'image/jpeg'))}
+                                style={tw`w-full bg-white py-4 rounded-full items-center justify-center shadow-lg`}
+                            >
+                                <Text style={tw`text-black text-lg font-[InterTight-SemiBold]`}>
+                                    Finish and Scan ({capturedImages.length} {capturedImages.length === 1 ? 'page' : 'pages'})
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        <View style={tw`bg-white/10 backdrop-blur-md rounded-full px-6 py-4 flex-row items-center justify-between border border-white/20`}>
+                            <TouchableOpacity
+                                onPress={() => setZoom(zoom === 0.1 ? 0 : 0.1)}
+                                style={tw`w-10 h-10 rounded-full bg-white/10 items-center justify-center`}
+                            >
+                                <Text style={tw`text-white font-bold text-xs`}>{zoom === 0.1 ? '0.5' : '1.0'}</Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => setTorch(!torch)}>
-                            {torch ? <Zap color="#fff" size={24} fill="#fff" /> : <ZapOff color="#fff" size={24} />}
-                        </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setTorch(!torch)}>
+                                {torch ? <Zap color="#fff" size={24} fill="#fff" /> : <ZapOff color="#fff" size={24} />}
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                            onPress={takePicture}
-                            style={tw`w-16 h-16 rounded-full border-4 border-white items-center justify-center bg-transparent`}
-                        >
-                            <View style={tw`w-12 h-12 rounded-full bg-white`} />
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={takePicture}
+                                style={tw`w-16 h-16 rounded-full border-4 border-white items-center justify-center bg-transparent`}
+                            >
+                                <View style={tw`w-12 h-12 rounded-full bg-white`} />
+                            </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => setFacing(facing === 'back' ? 'front' : 'back')}>
-                            <SwitchCamera color="#fff" size={24} />
-                        </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setFacing(facing === 'back' ? 'front' : 'back')}>
+                                <SwitchCamera color="#fff" size={24} />
+                            </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => setState('INTRO')}>
-                            <X color="#fff" size={24} />
-                        </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setState('INTRO')}>
+                                <X color="#fff" size={24} />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
 
@@ -527,7 +674,19 @@ export default function ScanCVScreen() {
 
                 {state === 'RESULT' && (
                     <TouchableOpacity
-                        onPress={() => router.push('/roadmap')}
+                        onPress={() => {
+                            if (selectedSkills.length === 0) {
+                                Alert.alert("Select skills", "Please select at least one skill to base your roadmap on.");
+                                return;
+                            }
+                            router.push({
+                                pathname: '/roadmap',
+                                params: { 
+                                    preSelectedSkills: selectedSkills.join(','),
+                                    autofill: 'true'
+                                }
+                            });
+                        }}
                         style={tw`w-full bg-white py-4 rounded-full items-center justify-center shadow-xl`}
                     >
                         <Text style={tw`text-black text-lg font-[InterTight-SemiBold]`}>Generate roadmap</Text>

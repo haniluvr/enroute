@@ -65,12 +65,19 @@ export default function HomeScreen() {
     // Priority: nickname first, then first name, lastly User
     const displayName = user?.user_metadata?.nickname || user?.user_metadata?.first_name || 'User';
 
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Morning';
+        if (hour < 18) return 'Afternoon';
+        return 'Evening';
+    };
+
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={tw`px-6 pt-16 pb-6 flex-row justify-between items-center`}>
-                    <Text style={tw`text-white font-[InterTight] font-semibold text-3xl`}>Hi {displayName}! 👋</Text>
+                    <Text style={tw`text-white font-[InterTight] font-semibold text-3xl`}>{getGreeting()}, {displayName}! 👋</Text>
 
                     <TouchableOpacity
                         style={tw`bg-white/10 p-2.5 rounded-xl border border-white/10`}

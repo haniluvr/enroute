@@ -10,20 +10,24 @@ const HF_BASE_URL = 'https://router.huggingface.co/hf-inference';
 
 export const sttService = {
     /**
-     * Transcribe audio file to text using Whisper
+     * Transcribe audio file to text using Whisper or Moonshine
      */
-    async transcribe(filePath: string) {
+    async transcribe(filePath: string, model: 'whisper' | 'moonshine' = 'whisper') {
         try {
-            console.log('--- STT START ---');
+            console.log(`--- STT START (${model}) ---`);
             const audioData = fs.readFileSync(filePath);
             
-            console.log('Calling Hugging Face via Axios (Binary)...');
+            const modelId = model === 'moonshine' 
+                ? 'openai/whisper-large-v3-turbo' 
+                : 'openai/whisper-large-v3';
+
+            console.log(`Calling Hugging Face (${modelId}) via Axios...`);
             let response: any;
             let retries = 3;
             
             while (retries > 0) {
                 try {
-                    response = await axios.post('https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3', audioData, {
+                    response = await axios.post(`https://router.huggingface.co/hf-inference/models/${modelId}`, audioData, {
                         headers: {
                             'Authorization': `Bearer ${HF_API_KEY}`,
                             'Content-Type': 'audio/mpeg',

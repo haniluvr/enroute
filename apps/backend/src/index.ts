@@ -26,8 +26,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use((req, res, next) => {
+    console.log(`\n📢 [API] >>> ${req.method} ${req.url} at ${new Date().toLocaleTimeString()} <<<`);
+    next();
+});
+
 // Redirect console to file for easier debugging
-const logFile = fs.createWriteStream('debug.log', { flags: 'a' });
+const logFile = fs.createWriteStream('backend.log', { flags: 'a' });
 const originalLog = console.log;
 const originalError = console.error;
 console.log = (...args) => {
@@ -117,8 +122,10 @@ app.post('/api/ai/stt', upload.single('audio'), async (req, res) => {
             return res.status(400).json({ error: 'No audio file provided' });
         }
 
-        console.log('Received audio file:', req.file.path);
-        const transcription = await sttService.transcribe(req.file.path);
+        const model = req.body.model as 'whisper' | 'moonshine' || 'whisper';
+        console.log(`Received audio file: ${req.file.path}, requested model: ${model}`);
+        
+        const transcription = await sttService.transcribe(req.file.path, model);
         
         // Clean up: delete original file
         fs.unlinkSync(req.file.path);
@@ -127,7 +134,7 @@ app.post('/api/ai/stt', upload.single('audio'), async (req, res) => {
     } catch (error) {
         console.error('STT Endpoint Error:', error);
         // Clean up even on error
-        if (req.file) fs.unlinkSync(req.file.path);
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         res.status(500).json({ error: 'Failed to transcribe audio' });
     }
 });
@@ -149,15 +156,54 @@ app.post('/api/ai/tts', async (req, res) => {
 });
 
 /**
- * CV Parsing Endpoint
+ * CV Parsing Endpoint (Upgraded with AI Vision & PDF Support)
  */
 app.post('/api/ai/parse-cv', async (req, res) => {
     try {
-        const { text } = req.body;
-        const skills = await aiService.parseCV(text);
-        res.json({ skills });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to parse CV' });
+        const { text, fileUrl, fileType } = req.body;
+        console.log(`[CV] Parsing request received. Type: ${fileType || 'text'}`);
+        
+        let skills: any = [];
+        let suggestedSkills: string[] = [];
+
+        if (fileUrl) {
+            const firstUrl = Array.isArray(fileUrl) ? fileUrl[0] : fileUrl;
+            const isPdf = fileType === 'application/pdf' || (typeof firstUrl === 'string' && firstUrl.toLowerCase().endsWith('.pdf'));
+            
+            console.log(`[CV] Processing fileUrl: ${Array.isArray(fileUrl) ? `Array(${fileUrl.length})` : fileUrl}, isPdf: ${isPdf}`);
+
+            if (isPdf) {
+                // 1. PDF Path: Extract text first, then analyze
+                const urlToProcess = Array.isArray(fileUrl) ? fileUrl[0] : fileUrl;
+                const extractedText = await aiService.extractTextFromPDF(urlToProcess);
+                skills = await aiService.parseCV(extractedText);
+            } else {
+                // 2. Image Path: Use Qwen 2.5 VL directly (supports single or multiple)
+                console.log(`[CV] Calling parseCVVision...`);
+                const result = await aiService.parseCVVision(fileUrl);
+                skills = result.skills;
+                console.log(`[CV] Vision result:`, JSON.stringify(skills));
+                // If the vision service already did suggestions, we take those
+                if (result.suggestedSkills) suggestedSkills = result.suggestedSkills;
+            }
+        } else if (text) {
+            // Legacy/Fallback: Parse text directly
+            skills = await aiService.parseCV(text);
+        }
+
+        // 3. Generate dynamic suggestions only if we haven't already got them
+        const flattenedSkills = Array.isArray(skills) ? skills : [...(skills.technical || []), ...(skills.soft || [])];
+        if (!suggestedSkills || suggestedSkills.length === 0) {
+            suggestedSkills = await aiService.suggestMissingSkills(flattenedSkills);
+        }
+
+        res.json({ 
+            skills, 
+            suggestedSkills 
+        });
+    } catch (error: any) {
+        console.error('CV Parse Endpoint Error:', error);
+        res.status(500).json({ error: 'Failed to parse CV', details: error.message });
     }
 });
 

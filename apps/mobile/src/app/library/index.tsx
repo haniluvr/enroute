@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Keyboard, A
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
     ChevronLeft,
     Search,
@@ -30,9 +30,11 @@ export default function LibraryScreen() {
     const [recentItems, setRecentItems] = React.useState<any[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
 
-    React.useEffect(() => {
-        fetchLibraryItems();
-    }, [user]);
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchLibraryItems();
+        }, [user])
+    );
 
     const fetchLibraryItems = async () => {
         if (!user) return;
@@ -55,7 +57,9 @@ export default function LibraryScreen() {
             const transformedItems = data.map(item => ({
                 id: item.id,
                 title: item.title || `${item.item_type.charAt(0).toUpperCase() + item.item_type.slice(1)}`,
-                subtitle: `Saved ${new Date(item.created_at).toLocaleDateString()}`,
+                subtitle: (item.item_type === 'idea' || item.item_type === 'conversation') 
+                    ? `Last modified: ${new Date(item.created_at).toLocaleDateString()} at ${new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                    : `Saved ${new Date(item.created_at).toLocaleDateString()}`,
                 type: item.item_type,
                 itemId: item.item_id
             }));
@@ -118,8 +122,7 @@ export default function LibraryScreen() {
             style={tw`mb-4`}
             onPress={() => {
                 if (type === 'roadmap') router.push(`/roadmap-details/${itemId}`);
-                else if (type === 'conversation') router.push('/(tabs)/dahlia');
-                else if (type === 'idea') router.push('/record-idea');
+                else if (type === 'conversation' || type === 'idea') router.push({ pathname: '/record-idea', params: { id: itemId } });
                 else Alert.alert("Coming soon", "This feature is being developed.");
             }}
         >

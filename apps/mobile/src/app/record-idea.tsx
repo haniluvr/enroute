@@ -51,7 +51,8 @@ import {
     Camera,
     Image as ImageIcon,
     FileText,
-    X as CloseIcon
+    X as CloseIcon,
+    Trash2
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -73,6 +74,7 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useLocalSearchParams } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
@@ -218,10 +220,13 @@ export default function RecordIdeaScreen() {
     const [processingProgress, setProcessingProgress] = useState(0);
     const isCancelledRef = useRef(false);
     const [showUploadModal, setShowUploadModal] = useState(false);
+    const { id } = useLocalSearchParams<{ id: string }>();
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
+    const [isLoadingExisting, setIsLoadingExisting] = useState(false);
     const [seconds, setSeconds] = useState(0);
-    const [transcription, setTranscription] = useState("I'm thinking about transitioning into UI Engineering. I have a strong background in backend development but I've always been more interested in the visual and interactive side of things. I want to build premium experiences.");
+    const [transcription, setTranscription] = useState("");
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef<ScrollView>(null);
@@ -241,6 +246,59 @@ export default function RecordIdeaScreen() {
     const pulse = useSharedValue(1);
     const micScale = useSharedValue(1);
     const metering = useSharedValue(-160);
+
+    useEffect(() => {
+        if (id) {
+            loadExistingConversation(id);
+        }
+    }, [id]);
+
+    const loadExistingConversation = async (convId: string) => {
+        setIsLoadingExisting(true);
+        try {
+            const { data: conv, error: convError } = await supabase
+                .from('conversations')
+                .select('*')
+                .eq('id', convId)
+                .single();
+
+            if (convError) throw convError;
+
+            const { data: msgs, error: msgsError } = await supabase
+                .from('conversation_messages')
+                .select('*')
+                .eq('conversation_id', convId)
+                .order('created_at', { ascending: true });
+
+            if (msgsError) throw msgsError;
+
+            setConversationId(convId);
+            const firstUserMsg = msgs.find(m => m.role === 'user');
+            setTranscription(firstUserMsg?.content || conv.title || "");
+            setMessages(msgs.map((m: any) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                timestamp: new Date(m.created_at)
+            })));
+
+            // Check if already in library
+            const { data: saveEntry } = await supabase
+                .from('library_saves')
+                .select('id')
+                .eq('item_id', convId)
+                .maybeSingle();
+            
+            if (saveEntry) setIsSaved(true);
+
+            setState('REFINE');
+        } catch (err) {
+            console.error('Load Conversation Error:', err);
+            Alert.alert("Error", "Failed to load the conversation.");
+        } finally {
+            setIsLoadingExisting(false);
+        }
+    };
 
     useEffect(() => {
         console.log('RecordIdeaScreen Auth State Change:', {
@@ -282,6 +340,7 @@ export default function RecordIdeaScreen() {
     }, [state, isPaused]);
 
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
+    const [isTranscribing, setIsTranscribing] = useState(false);
     const [audioUri, setAudioUri] = useState<string | null>(null);
     const [permissionResponse, requestPermission] = Audio.usePermissions();
 
@@ -342,7 +401,7 @@ export default function RecordIdeaScreen() {
     /**
      * Start Audio Recording
      */
-    async function startRecording() {
+    async function startRecording(isChat = false) {
         try {
             setRecording(null); // Clear previous
             
@@ -382,7 +441,9 @@ export default function RecordIdeaScreen() {
             setRecording(recording);
             setSeconds(0);
             setIsPaused(false);
-            setState('RECORDING');
+            if (!isChat && state !== 'REFINE') {
+                setState('RECORDING');
+            }
             console.log('Recording started');
         } catch (err) {
             console.error('Failed to start recording', err);
@@ -412,29 +473,37 @@ export default function RecordIdeaScreen() {
     /**
      * Stop Audio Recording & Send to Backend
      */
-    async function stopRecording() {
+    async function stopRecording(isChat = false) {
         console.log('Stopping recording..');
         if (!recording) return;
 
-        setState('PROCESSING');
+        if (!isChat && state !== 'REFINE') {
+            setState('PROCESSING');
+        }
         isCancelledRef.current = false;
         setRecording(null);
         await recording.stopAndUnloadAsync();
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+
+        if (state === 'REFINE') {
+            setIsTranscribing(true); // Start loader for chat
+        }
 
         const uri = recording.getURI();
         console.log('Recording stopped and stored at', uri);
 
         if (uri) {
             setAudioUri(uri);
-            await transcribeAudio(uri);
+            // Use whisper for initial thought, moonshine for chat if in REFINE state
+            const model = state === 'REFINE' ? 'moonshine' : 'whisper';
+            await transcribeAudio(uri, model);
         }
     }
 
     /**
      * Upload to Backend STT
      */
-    async function transcribeAudio(uri: string) {
+    async function transcribeAudio(uri: string, model: 'whisper' | 'moonshine' = 'whisper') {
         try {
             const formData = new FormData();
             // @ts-ignore
@@ -443,6 +512,7 @@ export default function RecordIdeaScreen() {
                 type: 'audio/m4a',
                 name: 'recording.m4a',
             });
+            formData.append('model', model);
 
             const response = await fetch(AI_API.STT, {
                 method: 'POST',
@@ -453,6 +523,14 @@ export default function RecordIdeaScreen() {
 
             const data = await response.json();
             if (data.transcription) {
+                if (state === 'REFINE') {
+                    // It's a follow-up voice message - stop loader and set to text input
+                    setIsTranscribing(false);
+                    setTranscription(data.transcription);
+                    setInputText(data.transcription);
+                    return;
+                }
+
                 setTranscription(data.transcription);
                 const result = await startIdeaConversation();
 
@@ -514,6 +592,13 @@ export default function RecordIdeaScreen() {
             console.log('AI Response data:', data);
 
             if (data.response) {
+                // Insert User Transcription as first message
+                await supabase.from('conversation_messages').insert({
+                    conversation_id: convId,
+                    role: 'user',
+                    content: transcribedText
+                });
+
                 const aiMessage: Message = {
                     id: Math.random().toString(36).substr(2, 9),
                     role: 'assistant',
@@ -529,6 +614,28 @@ export default function RecordIdeaScreen() {
                     role: 'assistant',
                     content: data.response
                 });
+
+                // Generate a short summary for the title
+                try {
+                    const sumResponse = await fetch(AI_API.CHAT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            persona: 'TitleBot',
+                            history: [{ role: 'user', content: `Summarize this idea in 4-6 words: ${transcribedText}` }]
+                        })
+                    });
+                    if (sumResponse.ok) {
+                        const sumData = await sumResponse.json();
+                        if (sumData.response) {
+                            await supabase.from('conversations')
+                                .update({ title: sumData.response.replace(/["']/g, '') })
+                                .eq('id', convId);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Title generation failed:', e);
+                }
             } else {
                 setMessages((prev: Message[]) => prev.filter((m: Message) => m.content !== 'Dahlia is analyzing your idea...'));
                 console.warn('AI returned empty response');
@@ -590,8 +697,53 @@ export default function RecordIdeaScreen() {
         }
     };
 
+    const handleDeleteFromLibrary = async () => {
+        if (!user || !conversationId) return;
+        
+        Alert.alert(
+            "Remove from Library",
+            "Are you sure you want to delete this from your saved library? Your history will remain.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Delete", 
+                    style: "destructive",
+                    onPress: async () => {
+                        setIsSaving(true);
+                        try {
+                            const { error } = await supabase
+                                .from('library_saves')
+                                .delete()
+                                .eq('user_id', user.id)
+                                .eq('item_id', conversationId);
+                            
+                            if (error) throw error;
+                            setIsSaved(false);
+                            Alert.alert(
+                                "Removed", 
+                                "Your idea has been removed from the library.",
+                                [{ text: "OK", onPress: () => router.back() }]
+                            );
+                        } catch (err) {
+                            console.error('Delete Save Error:', err);
+                            Alert.alert("Error", "Failed to remove from library.");
+                        } finally {
+                            setIsSaving(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleSave = async () => {
         if (!user || !conversationId) return;
+        
+        if (user.id === 'pending') {
+            Alert.alert("Sign In Required", "Please sign in to save this idea to your library.");
+            return;
+        }
+
         setIsSaving(true);
         try {
             let recordingUrl = null;
@@ -614,29 +766,21 @@ export default function RecordIdeaScreen() {
                 }
             }
 
-            // Save messages if any
-            if (messages.length > 0) {
-                const messagesToInsert = messages.map((msg: Message) => ({
-                    conversation_id: conversationId,
-                    role: msg.role,
-                    content: msg.content
-                }));
-                await supabase.from('conversation_messages').insert(messagesToInsert);
-            }
-
             // Mark as library item
-            await supabase.from('library_saves').insert({
+            const { error: saveError } = await supabase.from('library_saves').upsert({
                 user_id: user.id,
                 item_type: 'idea',
                 item_id: conversationId,
-                title: transcription.substring(0, 50) + '...',
+                title: transcription.substring(0, 50) + (transcription.length > 50 ? '...' : ''),
                 metadata: {
                     audio_url: recordingUrl
                 }
             });
 
-            Alert.alert("Success", "Idea saved to your library.");
-            router.replace('/library');
+            if (saveError) throw saveError;
+
+            setIsSaved(true);
+            Alert.alert("Saved!", "Your idea has been saved to your library.");
         } catch (err) {
             console.error('Save Idea Error:', err);
             Alert.alert("Error", "Failed to save idea.");
@@ -834,6 +978,12 @@ export default function RecordIdeaScreen() {
         setInputText('');
         Keyboard.dismiss();
 
+        await fetchChatAIResponse(currentInput);
+    };
+
+    const fetchChatAIResponse = async (text: string) => {
+        if (!conversationId) return;
+
         // Add thinking placeholder
         const thinkingMsg: Message = {
             id: 'thinking-' + Date.now(),
@@ -847,7 +997,7 @@ export default function RecordIdeaScreen() {
             await supabase.from('conversation_messages').insert({
                 conversation_id: conversationId,
                 role: 'user',
-                content: currentInput
+                content: text
             });
 
             // Call Backend AI
@@ -859,7 +1009,7 @@ export default function RecordIdeaScreen() {
                     history: messages.map((m: Message) => ({
                         role: m.role,
                         content: m.content
-                    })).concat([{ role: 'user', content: currentInput }])
+                    })).concat([{ role: 'user', content: text }])
                 })
             });
 
@@ -911,11 +1061,18 @@ export default function RecordIdeaScreen() {
                     </View>
 
                     <TouchableOpacity
-                        onPress={handleRestart}
-                        style={tw`w-11 h-11 rounded-2xl bg-white/10 border border-white/10 items-center justify-center`}
+                        onPress={isSaved ? handleDeleteFromLibrary : handleSave}
+                        disabled={isSaving}
+                        style={tw`w-11 h-11 rounded-2xl ${isSaved ? 'bg-red-500/10 border-red-500/20' : 'bg-white/10 border-white/10'} items-center justify-center ${isSaving ? 'opacity-50' : ''}`}
                         activeOpacity={0.7}
                     >
-                        <RotateCcw color="#fff" size={20} />
+                        {isSaving ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : isSaved ? (
+                            <Trash2 color="#ff4a4a" size={20} />
+                        ) : (
+                            <Save color="#fff" size={20} fill={isSaved ? "#fff" : "transparent"} />
+                        )}
                     </TouchableOpacity>
                 </View>
             );
@@ -954,8 +1111,13 @@ export default function RecordIdeaScreen() {
         >
             <GlassBackground locations={[0.0, 0.1, 0.3, 0.7]}>
                 {renderHeader()}
-
-                {state !== 'REFINE' ? (
+ 
+                {isLoadingExisting ? (
+                    <View style={tw`flex-1 items-center justify-center`}>
+                        <ActivityIndicator size="large" color="#fff" />
+                        <Text style={tw`text-white/60 font-[InterTight] mt-4`}>Loading conversation...</Text>
+                    </View>
+                ) : state !== 'REFINE' ? (
                     <View style={tw`flex-1`}>
                         {state === 'IDLE' && (
                             <Animated.View entering={FadeIn} exiting={FadeOut} style={tw`flex-1 items-center justify-between px-6 pb-12 pt-8`}>
@@ -980,7 +1142,7 @@ export default function RecordIdeaScreen() {
 
                                     <View style={tw`items-center justify-center`}>
                                         <TouchableOpacity
-                                            onPress={startRecording}
+                                            onPress={() => startRecording()}
                                             activeOpacity={0.8}
                                             onPressIn={() => micScale.value = withSpring(0.9)}
                                             onPressOut={() => micScale.value = withSpring(1)}
@@ -1030,7 +1192,7 @@ export default function RecordIdeaScreen() {
 
                                     <View style={tw`items-center justify-center`}>
                                         <TouchableOpacity
-                                            onPress={stopRecording}
+                                            onPress={() => stopRecording()}
                                             activeOpacity={0.8}
                                             style={tw`w-24 h-24 rounded-full overflow-hidden bg-white/10`}
                                         >
@@ -1119,7 +1281,7 @@ export default function RecordIdeaScreen() {
                                         </View>
                                         <Text style={tw`text-white font-[InterTight] font-semibold text-base`}>Original Thought</Text>
                                     </View>
-                                    <Text style={tw`text-gray-200 font-[InterTight] text-lg leading-6`}>
+                                    <Text style={tw`text-gray-200 font-[InterTight] text-base leading-6`}>
                                         "{transcription}"
                                     </Text>
                                 </GlassCard>
@@ -1140,7 +1302,7 @@ export default function RecordIdeaScreen() {
                                                     <User color="#fff" size={16} />
                                                 </View>
                                                 <View style={tw`p-4 rounded-2xl bg-white/5 border border-white/10 rounded-tr-none`}>
-                                                    <Text style={tw`text-white font-[InterTight] text-lg leading-6`}>
+                                                    <Text style={tw`text-white font-[InterTight] text-base leading-6`}>
                                                         {msg.content}
                                                     </Text>
                                                 </View>
@@ -1151,7 +1313,7 @@ export default function RecordIdeaScreen() {
                                             <View style={tw`w-full mb-2`}>
                                                 {msg.isUpdating ? (
                                                     <View style={tw`py-4`}>
-                                                        <Text style={tw`text-white/60 font-[InterTight-Medium] italic text-lg`}>
+                                                        <Text style={tw`text-white/60 font-[InterTight-Medium] italic text-base`}>
                                                             Dahlia is thinking...
                                                         </Text>
                                                     </View>
@@ -1230,36 +1392,47 @@ export default function RecordIdeaScreen() {
                         {/* Input Area */}
                         <BlurView intensity={30} tint="dark" style={tw`absolute bottom-0 left-0 right-0 p-6 pt-4 border-t border-white/10`}>
                             <View style={tw`flex-row items-center gap-3`}>
-                                <View style={tw`flex-1 flex-row items-center bg-white/5 border border-white/10 rounded-full p-2`}>
+                                <View style={tw`flex-1 flex-row items-end bg-white/5 border border-white/10 rounded-[28px] px-2 py-1`}>
                                     <TouchableOpacity
                                         onPress={() => setShowUploadModal(true)}
-                                        style={tw`p-2`}
+                                        style={tw`p-2 mb-1`}
                                     >
                                         <Paperclip color="#aaa" size={20} />
                                     </TouchableOpacity>
-                                    <TextInput
-                                        style={tw`flex-1 text-white font-[InterTight] text-[15px] px-2 py-3`}
-                                        placeholder="Add more details..."
-                                        placeholderTextColor="rgba(255,255,255,0.4)"
-                                        value={inputText}
-                                        onChangeText={setInputText}
-                                        multiline
-                                    />
+                                    <TouchableOpacity
+                                        onPress={recording ? () => stopRecording(true) : () => startRecording(true)}
+                                        style={tw`p-2 mb-1`}
+                                    >
+                                        {recording ? (
+                                            <Square color="#fb923c" size={20} fill="#fb923c" />
+                                        ) : (
+                                            <Mic color="#aaa" size={20} />
+                                        )}
+                                    </TouchableOpacity>
+                                    <View style={tw`flex-1 relative`}>
+                                        <TextInput
+                                            style={tw`flex-1 text-white font-[InterTight] text-base px-2 py-3 ${isTranscribing ? 'opacity-50' : ''}`}
+                                            placeholder={isTranscribing ? "Transcribing..." : "Add more details..."}
+                                            placeholderTextColor="rgba(255,255,255,0.4)"
+                                            value={inputText}
+                                            onChangeText={setInputText}
+                                            multiline
+                                            editable={!isTranscribing}
+                                        />
+                                        {isTranscribing && (
+                                            <View style={tw`absolute right-2 top-3`}>
+                                                <ActivityIndicator size="small" color="#fff" />
+                                            </View>
+                                        )}
+                                    </View>
                                     <TouchableOpacity
                                         onPress={handleSendMessage}
                                         disabled={!inputText.trim()}
-                                        style={tw`w-10 h-10 rounded-full bg-white items-center justify-center ml-2 ${!inputText.trim() ? 'opacity-50' : ''}`}
+                                        style={tw`w-10 h-10 rounded-full bg-white items-center justify-center ml-2 mb-1 ${!inputText.trim() ? 'opacity-50' : ''}`}
                                     >
                                         <Send color="#000" size={18} />
                                     </TouchableOpacity>
                                 </View>
-
-                                <TouchableOpacity
-                                    onPress={handleSave}
-                                    style={tw`w-14 h-14 rounded-full bg-accent-violet items-center justify-center shadow-lg shadow-accent-violet/30`}
-                                >
-                                    <Save color="#fff" size={24} />
-                                </TouchableOpacity>
                             </View>
                         </BlurView>
 

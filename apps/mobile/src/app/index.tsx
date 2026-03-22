@@ -9,6 +9,7 @@ import Animated, { FadeIn, FadeOut, SlideInDown } from 'react-native-reanimated'
 
 export default function Index() {
   const [showSplash, setShowSplash] = useState(true);
+  const [isExitingIntro, setIsExitingIntro] = useState(false);
 
   useEffect(() => {
     // Simulate app loading/splash screen specifically for 2 seconds
@@ -17,6 +18,14 @@ export default function Index() {
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleGetStarted = () => {
+    setIsExitingIntro(true);
+    // Allow animation to play before navigation
+    setTimeout(() => {
+      router.push('/onboarding');
+    }, 800);
+  };
 
   return (
     <GlassBackground>
@@ -27,19 +36,28 @@ export default function Index() {
           exiting={FadeOut.duration(800)}
           style={tw`flex-1 items-center justify-center`}
         >
-          <View style={tw`flex-row items-center justify-center mb-8`}>
+          <Animated.View 
+            entering={FadeIn.delay(200).duration(1000)}
+            exiting={FadeOut.duration(600)}
+            style={tw`flex-row items-center justify-center mb-8`}
+          >
             <Image source={require('@/assets/logo.png')} style={tw`w-12 h-12 mr-3`} resizeMode="contain" />
             <Text style={tw`text-5xl text-white font-[InterTight] font-bold italic`}>enroute</Text>
-          </View>
-          <Text style={tw`absolute bottom-10 text-gray-500 font-[InterTight] text-xs`}>
+          </Animated.View>
+          <Animated.Text 
+            entering={FadeIn.delay(600).duration(800)}
+            exiting={FadeOut.duration(600)}
+            style={tw`absolute bottom-10 text-gray-500 font-[InterTight] text-xs`}
+          >
             v1.0.0
-          </Text>
+          </Animated.Text>
         </Animated.View>
       ) : (
         // Intro Screen
         <Animated.View
           entering={FadeIn.delay(300).duration(800)}
-          style={tw`flex-1 px-6 justify-end pb-10`}
+          exiting={FadeOut.duration(800)}
+          style={[tw`flex-1 px-6 justify-end pb-10`, isExitingIntro && { opacity: 0 }]}
         >
           <View style={tw`mb-10 text-left`}>
             <Animated.Text entering={FadeIn.delay(400)} style={tw`text-4xl text-white font-[InterTight] font-bold mb-2 leading-10`}>
