@@ -9,6 +9,7 @@ import {
     FileText,
     Video,
     Wrench,
+    GraduationCap,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -23,4 +24,5 @@ export const pathIconMap: Record<string, LucideIcon> = {
     FileText,
     Video,
     Wrench,
+    GraduationCap,
 };

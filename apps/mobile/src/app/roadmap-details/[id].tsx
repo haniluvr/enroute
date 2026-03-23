@@ -6,66 +6,143 @@ import {
     TouchableOpacity,
     SafeAreaView,
     ActivityIndicator,
+    ImageBackground,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, GraduationCap, Calendar, Download, FileText, Video, Wrench, Star, ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, GraduationCap, Calendar, Download, FileText, Video, Wrench, Star, ChevronRight, Lightbulb } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import { careerDetailsMap } from '@/data/pathMockData';
 import { pathIconMap } from '@/components/path/pathIconMap';
+import { RoadmapCanvas } from '@/components/path/RoadmapCanvas';
+import { NodeDetailsSheet } from '@/components/path/NodeDetailsSheet';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
+import type { CareerDetails, ResourceItem } from '@/types/path';
+import { parseModuleTitle, parsePathMeta, formatPathTitle } from '@/utils/pathUtils';
 
 export default function RoadmapDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
+    const [selectedNode, setSelectedNode] = useState<any>(null);
 
-    const career = id ? careerDetailsMap[id as keyof typeof careerDetailsMap] : null;
+    const careerMock = id ? careerDetailsMap[id as keyof typeof careerDetailsMap] : null;
 
     const [dbStep, setDbStep] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!id || career) {
+        if (!id || (careerMock && id.length < 5)) { // If it's a mock ID like '1', '2'
             setIsLoading(false);
             return;
         }
 
-        const fetchStep = async () => {
+        const fetchFullStepData = async () => {
+            setIsLoading(true);
             try {
-                const { data, error } = await supabase
+                // 1. Fetch the Roadmap Step
+                const { data: stepData, error: stepError } = await supabase
                     .from('roadmap_steps')
-                    .select('*, roadmaps(salary_range, demand_level, estimated_duration)')
+                    .select('id, title, description, roadmap_id, roadmaps(id, target_role, salary_range, demand_level, estimated_duration)')
                     .eq('id', id)
                     .single();
 
-                if (data) {
-                    setDbStep({
-                        title: data.title,
-                        description: data.description,
-                        learnItems: data.learn_items || [],
-                        jobDemand: data.roadmaps?.demand_level || 'Medium',
-                        avgSalary: data.roadmaps?.salary_range || 'Competitive',
-                        estTimeToComplete: data.roadmaps?.estimated_duration || '3-6 months',
-                        pdfs: [],
-                        videos: [],
-                        articles: [],
-                        reviews: [],
-                        icon: 'GraduationCap'
-                    });
+                if (stepError) throw stepError;
+
+                const roadmapMeta = Array.isArray(stepData.roadmaps) ? stepData.roadmaps[0] : stepData.roadmaps;
+                const stepTitle = (stepData.title || '').trim().toLowerCase();
+                const targetRole = (roadmapMeta?.target_role || '').trim().toLowerCase();
+
+                // 2. SEARCH FOR MATCHING CAREER PATH (THE CORE FIX)
+                // We try to match the specific step first, then the overall roadmap role as fallback
+                const cleanStepSearch = stepTitle.replace(/^step \d+: /i, '').replace(/^phase \d+: /i, '');
+                
+                const { data: pathData } = await supabase
+                    .from('learning_paths')
+                    .select('*')
+                    .or(`title.ilike.%${cleanStepSearch}%,title.ilike.%${targetRole}%,overview.ilike.%${targetRole}%`)
+                    .limit(1)
+                    .maybeSingle();
+
+                let allModules: any[] = [];
+                if (pathData) {
+                    const { data: modules } = await supabase
+                        .from('learning_modules')
+                        .select('*')
+                        .eq('path_id', pathData.id);
+                    if (modules) allModules = modules;
                 }
+
+                // 3. APPLY RESOURCES LOGIC FROM CAREER-DETAILS (Exact Mirror)
+                const videos: ResourceItem[] = allModules
+                    .filter((m: any) => m.content_type === 'video')
+                    .map((m: any) => ({
+                        id: m.id,
+                        name: m.title,
+                        url: m.content_url,
+                        duration: Math.floor(Math.random() * 15) + 5
+                    }));
+
+                const pdfs: ResourceItem[] = allModules.slice(0, 3).map((m: any) => {
+                    const { cleanTitle } = parseModuleTitle(m.title);
+                    return {
+                        id: m.id + '-pdf',
+                        name: `Comprehensive Guide to ${cleanTitle}`,
+                        url: '',
+                        fileSize: `${(Math.random() * 3 + 1).toFixed(1)} MB`
+                    };
+                });
+
+                const articles: ResourceItem[] = allModules.slice(3, 7).map((m: any) => {
+                    const { cleanTitle } = parseModuleTitle(m.title);
+                    return {
+                        id: m.id + '-article',
+                        name: `Best Practices in ${cleanTitle}`,
+                        url: `https://www.google.com/search?q=${encodeURIComponent('best practices ' + cleanTitle)}`
+                    };
+                });
+
+                // 4. PARSE ROADMAP GRAPH
+                let roadmapGraph = { nodes: [], edges: [] };
+                const overview = pathData?.overview || '';
+                const roadmapMatch = overview.match(/\[ROADMAP\]([\s\S]*?)\[\/ROADMAP\]/);
+                if (roadmapMatch) {
+                    try { roadmapGraph = JSON.parse(roadmapMatch[1]); } catch (e) {}
+                }
+
+                const meta = parsePathMeta(overview);
+
+                setDbStep({
+                    ...pathData, // Inherit path data if found
+                    id: stepData.id,
+                    title: stepData.title,
+                    description: stepData.description,
+                    overview: overview,
+                    learnItems: allModules.map((m: any) => m.title),
+                    jobDemand: roadmapMeta?.demand_level || 'High',
+                    avgSalary: roadmapMeta?.salary_range || 'Competitive',
+                    estTimeToComplete: roadmapMeta?.estimated_duration || '6-12 months',
+                    pdfs: pdfs.length > 0 ? pdfs : [],
+                    videos: videos.length > 0 ? videos : [],
+                    articles: articles.length > 0 ? articles : [],
+                    reviews: [],
+                    icon: 'GraduationCap',
+                    roadmapGraph: roadmapGraph,
+                    meta: meta
+                });
+
             } catch (err) {
-                console.error('Fetch step error:', err);
+                console.error('Fetch Error:', err);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchStep();
-    }, [id, career]);
+        fetchFullStepData();
+    }, [id, careerMock]);
 
-    const displayData = career || dbStep;
+    const displayData = careerMock || dbStep;
 
     if (isLoading) {
         return (
@@ -77,294 +154,143 @@ export default function RoadmapDetailsScreen() {
         );
     }
 
-    if (!displayData) {
-        return (
-            <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
-                <SafeAreaView style={tw`flex-1`}>
-                    <View style={tw`px-6 pt-4`}>
-                        <TouchableOpacity
-                            onPress={() => router.back()}
-                            style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-8`}
-                        >
-                            <ChevronLeft color="#ffffff" size={24} />
-                        </TouchableOpacity>
-                        <Text style={tw`text-gray-400 font-[InterTight]`}>Course not found.</Text>
-                    </View>
-                </SafeAreaView>
-            </GlassBackground>
-        );
-    }
+    if (!displayData) return null;
 
-    const IconComponent = pathIconMap[career.icon] ?? pathIconMap.Palette;
-
-    const toggleReviewExpanded = (reviewId: string) => {
-        setExpandedReviews((prev) => ({ ...prev, [reviewId]: !prev[reviewId] }));
-    };
+    const IconComponent = pathIconMap[displayData.meta?.icon] ?? pathIconMap.GraduationCap;
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
             <ScrollView style={tw`flex-1`} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 <View style={tw`px-6 pt-16 pb-20`}>
-                    {/* Back Button */}
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                        style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-6`}
-                    >
+                    <TouchableOpacity onPress={() => router.back()} style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-6`}>
                         <ChevronLeft color="#ffffff" size={24} />
                     </TouchableOpacity>
 
-                    {/* Header */}
-                    <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-2`}>
-                        Your learning roadmap
-                    </Text>
-                    <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-4`}>
-                        Learn, practice, and grow with resources tailored for this role
-                    </Text>
-                    <Text style={tw`text-white/80 font-[InterTight-Medium] text-xl mb-8`}>
-                        {career.title} path
-                    </Text>
+                    {/* Matching Headers from Career-Details with minor variations */}
+                    <Text style={tw`text-white font-[InterTight] font-semibold text-3xl mb-2`}>Your learning roadmap</Text>
+                    <Text style={tw`text-gray-400 font-[InterTight] text-lg mb-4`}>Learn, practice, and grow with resources tailored for this role</Text>
+                    <Text style={tw`text-white/80 font-[InterTight-Medium] text-xl mb-8`}>{displayData.title} path</Text>
 
-                    {/* Card 1: Course Overview */}
+                    {/* Card 1: Course Overview (Equivalent to Role Overview) */}
                     <GlassCard style={tw`p-5 bg-white/10 border-t border-white/20 mb-4`} noPadding>
                         <View style={tw`flex-row items-center mb-4`}>
                             <View style={tw`bg-[#f43f5e]/20 px-3 py-1.5 rounded-full flex-row items-center border border-[#f43f5e]/60 mr-2`}>
                                 <GraduationCap color="#f43f5e" size={14} style={tw`mr-1.5`} />
-                                <Text style={tw`text-[#f43f5e] font-[InterTight-Medium] text-sm`}>
-                                    Step overview
-                                </Text>
+                                <Text style={tw`text-[#f43f5e] font-[InterTight-Medium] text-sm`}>Course overview</Text>
                             </View>
                         </View>
-                        <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg mb-2`}>
-                            {displayData.description}
-                        </Text>
-                        <Text style={tw`text-gray-300 font-[InterTight-SemiBold] text-base mb-2`}>
-                            What you'll learn in this step:
-                        </Text>
-                        <View style={tw`mb-4 pl-2`}>
-                            {displayData.learnItems.map((item: string, i: number) => (
-                                <Text key={i} style={tw`text-white font-[InterTight] text-lg mb-1`}>
-                                    • {item}
-                                </Text>
-                            ))}
-                        </View>
-                        <View style={tw`bg-white/5 rounded-xl p-4`}>
-                            <View style={tw`flex-row items-center mb-2`}>
-                                <GraduationCap color="#fcfcfc80" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
-                                    Market Demand: {displayData.jobDemand}
-                                </Text>
+                        
+                        <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg mb-2`}>Interactive roadmap:</Text>
+                        
+                        {displayData.roadmapGraph?.nodes?.length > 0 ? (
+                            <RoadmapCanvas data={displayData.roadmapGraph} onNodePress={setSelectedNode} />
+                        ) : (
+                            <View style={tw`mb-4 mt-2 px-2 py-8 items-center bg-black/10 rounded-2xl`}>
+                                <Text style={tw`text-white/30 font-[InterTight]`}>Generating visual graph data...</Text>
                             </View>
-                            <View style={tw`flex-row items-center mb-2`}>
-                                <Star color="#fcfcfc80" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
-                                    Career Prospects: {displayData.avgSalary}
-                                </Text>
+                        )}
+
+                        <View style={tw`bg-white/5 rounded-xl p-4 mt-4`}>
+                            <View style={tw`flex-row items-center mb-3`}>
+                                <Lightbulb color="#fcfcfc80" size={16} style={tw`mr-3`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>Market Demand: <Text style={tw`text-white`}>{displayData.jobDemand}</Text></Text>
+                            </View>
+                            <View style={tw`flex-row items-center mb-3`}>
+                                <IconComponent color="#fcfcfc80" size={16} style={tw`mr-3`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>Avg Salary: <Text style={tw`text-white`}>{displayData.avgSalary}</Text></Text>
                             </View>
                             <View style={tw`flex-row items-center`}>
-                                <Calendar color="#fcfcfc80" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-400 font-[InterTight] text-base`}>
-                                    Est time for path: {displayData.estTimeToComplete}
-                                </Text>
+                                <Calendar color="#fcfcfc80" size={16} style={tw`mr-3`} />
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>Est time for path: <Text style={tw`text-white`}>{displayData.estTimeToComplete}</Text></Text>
                             </View>
                         </View>
                     </GlassCard>
 
-                    {/* Card 2: Learning Materials */}
+                    {/* Card 2: Learning Materials (Exact Mirror of Career-Details Layout) */}
                     <GlassCard style={tw`p-5 bg-white/10 border-t border-white/20 mb-4`} noPadding>
                         <View style={tw`flex-row items-center mb-4`}>
                             <View style={tw`bg-[#EAB308]/20 px-3 py-1.5 rounded-full flex-row items-center border border-[#EAB308]/60 mr-2`}>
                                 <FileText color="#EAB308" size={14} style={tw`mr-1.5`} />
-                                <Text style={tw`text-[#EAB308] font-[InterTight-Medium] text-sm`}>
-                                    Learning materials
-                                </Text>
+                                <Text style={tw`text-[#EAB308] font-[InterTight-Medium] text-sm`}>Learning materials</Text>
                             </View>
                         </View>
 
                         {/* PDFs */}
-                        {career.pdfs.length > 0 && (
-                            <>
+                        {displayData.pdfs?.length > 0 && (
+                            <View style={tw`mb-6`}>
                                 <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-3`}>PDFs</Text>
-                                {career.pdfs.map((pdf, i) => (
+                                {displayData.pdfs.map((pdf: any, i: number) => (
                                     <View key={pdf.id}>
                                         <View style={tw`flex-row justify-between items-center`}>
-                                            <Text style={tw`text-gray-300 font-[InterTight] text-base`}>
-                                                {pdf.name}
-                                            </Text>
+                                            <Text style={tw`text-gray-300 font-[InterTight] text-base flex-1 mr-4`}>{pdf.name}</Text>
                                             <TouchableOpacity style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center`}>
                                                 <Download color="#fff" size={16} />
                                             </TouchableOpacity>
                                         </View>
-                                        {pdf.fileSize && (
-                                            <Text style={tw`text-gray-500 font-[InterTight] text-sm mb-3`}>
-                                                {pdf.fileSize}
-                                            </Text>
-                                        )}
-                                        {i < career.pdfs.length - 1 && (
-                                            <View style={[tw`h-px bg-white/10 mb-3`, { width: '80%' }]} />
-                                        )}
+                                        {pdf.fileSize && <Text style={tw`text-gray-500 font-[InterTight] text-sm mb-3`}>{pdf.fileSize}</Text>}
+                                        {i < displayData.pdfs.length - 1 && <View style={[tw`h-px bg-white/10 mb-3`, { width: '80%' }]} />}
                                     </View>
                                 ))}
-                                <View style={[tw`h-px bg-white/10 mb-4`, { width: '80%' }]} />
-                            </>
+                            </View>
                         )}
 
-                        {/* Videos */}
-                        {career.videos.length > 0 && (
-                            <>
+                        {/* Videos (with the same thumbnail logic) */}
+                        {displayData.videos?.length > 0 && (
+                            <View style={tw`mb-6`}>
                                 <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-3`}>Videos</Text>
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={tw`mb-4`}>
-                                    {career.videos.map((video) => (
-                                        <View
-                                            key={video.id}
-                                            style={tw`w-62 h-42 bg-white/10 rounded-xl mr-3 p-3 justify-end`}
-                                        >
-                                            <Text style={tw`text-white font-[InterTight-Medium] text-sm`} numberOfLines={1}>
-                                                {video.name}
-                                            </Text>
-                                            <Text style={tw`text-gray-500 font-[InterTight] text-xs`}>
-                                                {video.duration} mins
-                                            </Text>
-                                        </View>
-                                    ))}
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    {displayData.videos.map((video: any) => {
+                                        const { cleanTitle } = parseModuleTitle(video.name);
+                                        const videoId = video.url?.split('v=')[1]?.split('&')[0];
+                                        const thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+
+                                        return (
+                                            <TouchableOpacity key={video.id} style={tw`mr-3`}>
+                                                <ImageBackground source={thumbnailUrl ? { uri: thumbnailUrl } : undefined} style={tw`w-62 h-35 bg-white/10 rounded-xl overflow-hidden justify-end`} imageStyle={tw`opacity-60`}>
+                                                    <View style={tw`p-3 bg-black/40`}>
+                                                        <Text style={tw`text-white font-[InterTight-Medium] text-sm`} numberOfLines={1}>{cleanTitle}</Text>
+                                                        <Text style={tw`text-gray-300 font-[InterTight] text-[10px]`}>Tutorial Resource</Text>
+                                                    </View>
+                                                </ImageBackground>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
                                 </ScrollView>
-                                <View style={[tw`h-px bg-white/10 mb-4`, { width: '80%' }]} />
-                            </>
+                            </View>
                         )}
 
-                        {/* Articles & Tools */}
-                        {career.articles.length > 0 && (
-                            <>
+                        {/* Articles */}
+                        {displayData.articles?.length > 0 && (
+                            <View style={tw`mb-6`}>
                                 <Text style={tw`text-white font-[InterTight-SemiBold] text-lg mb-3`}>Articles & Tools</Text>
-                                {career.articles.map((article, i) => (
+                                {displayData.articles.map((article: any, i: number) => (
                                     <View key={article.id}>
                                         <View style={tw`flex-row justify-between items-center mb-1`}>
-                                            <Text style={tw`text-gray-300 font-[InterTight] text-base`}>
-                                                {article.name}
-                                            </Text>
+                                            <Text style={tw`text-gray-300 font-[InterTight] text-base flex-1 mr-4`}>{article.name}</Text>
                                             <TouchableOpacity style={tw`w-8 h-8 rounded-full bg-white/10 items-center justify-center`}>
                                                 <Download color="#fff" size={16} />
                                             </TouchableOpacity>
                                         </View>
-                                        {i < career.articles.length - 1 && (
-                                            <View style={[tw`h-px bg-white/10 mb-3`, { width: '80%' }]} />
-                                        )}
+                                        {i < displayData.articles.length - 1 && <View style={[tw`h-px bg-white/10 mb-3`, { width: '80%' }]} />}
                                     </View>
                                 ))}
-                                <View style={[tw`h-px bg-white/10 mb-4`, { width: '80%' }]} />
-                            </>
+                            </View>
                         )}
-
-                        {/* Counts */}
-                        <View style={tw`bg-white/5 rounded-xl p-4`}>
-                            <View style={tw`flex-row items-center mb-2`}>
-                                <FileText color="#fcfcfc80" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>
-                                    PDFs: {career.pdfs.length}
-                                </Text>
-                            </View>
-                            <View style={tw`flex-row items-center mb-2`}>
-                                <Video color="#fcfcfc80" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>
-                                    Videos: {career.videos.length}
-                                </Text>
-                            </View>
-                            <View style={tw`flex-row items-center`}>
-                                <Wrench color="#fcfcfc80" size={16} style={tw`mr-2`} />
-                                <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>
-                                    Articles & Tools: {career.articles.length}
-                                </Text>
-                            </View>
-                        </View>
                     </GlassCard>
 
-                    {/* Reviews */}
-                    {career.reviews.length > 0 && (
-                        <View style={tw`mb-6`}>
-                            <View style={tw`flex-row justify-between items-center mb-4`}>
-                                <Text style={tw`text-white font-[InterTight-SemiBold] text-lg`}>
-                                    Reviews ({career.reviews.length})
-                                </Text>
-                                <TouchableOpacity style={tw`flex-row items-center`}>
-                                    <Text style={tw`text-gray-300 font-[InterTight] text-base`}>See all</Text>
-                                    <ChevronRight color="#888" size={18} style={tw`ml-1`} />
-                                </TouchableOpacity>
-                            </View>
-
-                            {career.reviews.map((review: any) => {
-                                const isExpanded = expandedReviews[review.id];
-                                return (
-                                    <View key={review.id} style={tw`mb-4`}>
-                                        <GlassCard style={tw`p-4 bg-white/10 border-t border-white/10`} noPadding>
-                                            <View style={tw`flex-row justify-between items-start`}>
-                                                <View style={tw`flex-row`}>
-                                                    <View style={tw`w-10 h-10 rounded-full bg-white/20 items-center justify-center mr-3`}>
-                                                        <Text style={tw`text-white font-[InterTight-SemiBold] text-base`}>
-                                                            {review.authorName.charAt(0)}
-                                                        </Text>
-                                                    </View>
-                                                    <View>
-                                                        <Text style={tw`text-white font-[InterTight-Medium] text-base`}>
-                                                            {review.authorName}
-                                                        </Text>
-                                                        <View style={tw`flex-row items-center mt-1`}>
-                                                            {[1, 2, 3, 4, 5].map((star) => (
-                                                                <Star
-                                                                    key={star}
-                                                                    color="#EEDF7A"
-                                                                    size={14}
-                                                                    fill={star <= review.rating ? '#EEDF7A' : 'transparent'}
-                                                                    style={tw`mr-0.5`}
-                                                                />
-                                                            ))}
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                            <Text
-                                                style={tw`text-gray-400 font-[InterTight] text-sm mt-3`}
-                                                numberOfLines={isExpanded ? undefined : 3}
-                                            >
-                                                {review.text}
-                                            </Text>
-                                            {review.text.length > 100 && (
-                                                <TouchableOpacity
-                                                    onPress={() => toggleReviewExpanded(review.id)}
-                                                    style={tw`mt-2`}
-                                                >
-                                                    <Text style={tw`text-[#EEDF7A] font-[InterTight-Medium] text-sm`}>
-                                                        {isExpanded ? 'Read less' : 'Read more'}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        </GlassCard>
-                                    </View>
-                                );
-                            })}
-                        </View>
-                    )}
-
-                    {/* Action Buttons - scrollable with content */}
+                    {/* Action Buttons */}
                     <View style={tw`mt-6`}>
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={tw`w-full bg-white py-4 rounded-full items-center justify-center mb-4`}
-                        >
-                            <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>
-                                Start learning
-                            </Text>
+                        <TouchableOpacity style={tw`w-full bg-white py-4 rounded-full items-center justify-center mb-4`}>
+                            <Text style={tw`text-black text-lg font-bold`}>START LEARNING</Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity
-                            activeOpacity={0.75}
-                            style={tw`w-full py-4 rounded-full items-center justify-center border border-white/25 bg-transparent`}
-                        >
-                            <Text style={tw`text-white text-lg font-[InterTight] font-semibold`}>
-                                Save module
-                            </Text>
+                        <TouchableOpacity style={tw`w-full py-4 rounded-full items-center justify-center border border-white/20 bg-transparent`}>
+                            <Text style={tw`text-white text-lg font-semibold`}>Save module</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
             </ScrollView>
+
+            <NodeDetailsSheet visible={!!selectedNode} node={selectedNode} onClose={() => setSelectedNode(null)} />
         </GlassBackground>
     );
 }

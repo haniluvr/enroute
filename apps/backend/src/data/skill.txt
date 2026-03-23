@@ -1,0 +1,20 @@
+React: A JavaScript library for building user interfaces. Key: Components, Hooks, State, Props.
+Node.js: JavaScript runtime for backend services. Key: Express, NPM, Events, Streams.
+SQL: Language for querying relational databases. Key: JOIN, SELECT, Indexes, Normalization.
+Python: General purpose language for data, web, and scripting. Key: Pandas, Flask, Scripting.
+User research: Interacting with users to understand needs. Key: Personas, Surveys, Feedback.
+Wireframing: Creating low-fidelity UI sketches. Key: Low-fi, Layout, Flow.
+Figma: Industry standard design tool. Key: Auto-layout, Variants, Prototyping.
+Programming fundamentals: Logic, variables, loops. Key: Clean Code, DRY, Solid.
+Data structures: Organization of data for efficiency. Key: Arrays, HashMaps, Trees, Graphs.
+System design: Scalability and architectural planning. Key: Microservices, APIs, Load balancing.
+Product strategy: Long-term vision and planning. Key: OKRs, Roadmap, Prioritization.
+Agile: Iterative development framework. Key: Scrum, Kanban, Sprint, Retro.
+Docker: Containerization tool. Key: Images, Compose, Orchestration.
+AWS: Cloud services platform. Key: EC2, S3, RDS, Lambda.
+TypeScript: Statically typed JavaScript extension. Key: Interfaces, Types, Generics.
+Git: Version control system. Key: Commits, Branching, PRs, Merge.
+Unit Testing: Testing individual components. Key: Jest, Mocha, Pytest.
+Machine Learning: Statistical models for predictions. Key: Supervised, Training, Inference.
+LLMs: Large Language Models. Key: GPT, Prompt Engineering, Context Window.
+RAG: Retrieval-Augmented Generation for AI. Key: Vector DB, Semantic Search.

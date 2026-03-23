@@ -245,7 +245,7 @@ export default function ScanCVScreen() {
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('cv_uploads')
                     .upload(fileName, arrayBuffer, { 
-                        contentType: type,
+                        contentType: `${type}; charset=utf-8`, // Ensure charset is specified for strict parsing
                         upsert: false 
                     });
 
@@ -306,6 +306,76 @@ export default function ScanCVScreen() {
     };
 
     const [scanResult, setScanResult] = useState<any>(null);
+    const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+
+    const handleGenerateRoadmap = async () => {
+        if (!user || user.id === 'pending') return;
+        if (selectedSkills.length === 0) {
+            Alert.alert("Select skills", "Please select at least one skill to base your roadmap on.");
+            return;
+        }
+
+        setIsGeneratingRoadmap(true);
+        try {
+            // Find a goal (Suggested role from AI, or first skill + Specialist)
+            const goal = scanResult?.suggested_role || `${selectedSkills[0]} Professional Path`;
+
+            // 1. Generate via AI
+            const response = await fetch(AI_API.ROADMAP, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ goal, currentSkills: selectedSkills })
+            });
+            const data = await response.json();
+
+            if (!data.roadmap) throw new Error('Generation failed');
+
+            // 2. Save directly to Supabase from Scan CV
+            const { data: roadmap, error: roadmapError } = await supabase
+                .from('roadmaps')
+                .insert({
+                    user_id: user.id,
+                    goal: goal,
+                    target_role: goal, // Required by DB schema
+                    estimated_duration: data.estimated_duration || '6-12 Months',
+                    salary_range: data.salary || 'Competitive',
+                    demand_level: data.demand || 'High',
+                    current_skills: selectedSkills
+                })
+                .select().single();
+
+            if (roadmapError) throw roadmapError;
+
+            const stepsToInsert = data.roadmap.map((step: any, index: number) => ({
+                roadmap_id: roadmap.id,
+                title: step.title,
+                description: step.description,
+                is_completed: false,
+                educational_platform: step.platform || 'General',
+                has_certification: !!step.platform && step.platform?.toLowerCase()?.includes?.('coursera'),
+                is_professional_cert: false,
+                order: index
+            }));
+
+            const { data: savedSteps, error: stepError } = await supabase.from('roadmap_steps').insert(stepsToInsert).select();
+            if (stepError) throw stepError;
+
+            console.log(`[CV Scan] Saved roadmap ${roadmap.id} with ${savedSteps.length} steps.`);
+
+            // 3. Briefly wait and then Navigate to result (ensures DB readiness)
+            setTimeout(() => {
+                router.push({
+                    pathname: '/roadmap',
+                    params: { roadmapId: roadmap.id }
+                });
+            }, 500);
+        } catch (err) {
+            console.error('Generation Error:', err);
+            Alert.alert("Error", "Failed to generate roadmap. Please try again.");
+        } finally {
+            setIsGeneratingRoadmap(false);
+        }
+    };
 
     const handleFileUpload = async (source: 'photos' | 'camera' | 'files') => {
         setPickerType(null);
@@ -674,22 +744,18 @@ export default function ScanCVScreen() {
 
                 {state === 'RESULT' && (
                     <TouchableOpacity
-                        onPress={() => {
-                            if (selectedSkills.length === 0) {
-                                Alert.alert("Select skills", "Please select at least one skill to base your roadmap on.");
-                                return;
-                            }
-                            router.push({
-                                pathname: '/roadmap',
-                                params: { 
-                                    preSelectedSkills: selectedSkills.join(','),
-                                    autofill: 'true'
-                                }
-                            });
-                        }}
-                        style={tw`w-full bg-white py-4 rounded-full items-center justify-center shadow-xl`}
+                        onPress={handleGenerateRoadmap}
+                        disabled={isGeneratingRoadmap}
+                        style={tw`w-full bg-white py-4 rounded-full items-center justify-center shadow-xl flex-row`}
                     >
-                        <Text style={tw`text-black text-lg font-[InterTight-SemiBold]`}>Generate roadmap</Text>
+                        {isGeneratingRoadmap ? (
+                            <>
+                                <ActivityIndicator color="#000" style={tw`mr-2`} />
+                                <Text style={tw`text-black text-lg font-[InterTight-SemiBold]`}>Generating roadmap...</Text>
+                            </>
+                        ) : (
+                            <Text style={tw`text-black text-lg font-[InterTight-SemiBold]`}>Generate roadmap</Text>
+                        )}
                     </TouchableOpacity>
                 )}
             </View>

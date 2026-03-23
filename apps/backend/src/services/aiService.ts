@@ -329,60 +329,91 @@ export const aiService = {
      */
     async generateRoadmap(goal: string, currentSkills: string[]) {
         try {
-            // 1. Fetch Job Stats for the goal
+            // 1. Fetch Job Stats for the goal (Quick Adzuna call)
             const stats = await externalDataService.getJobStats(goal);
             
-            // 2. Fetch Base Curriculum if possible
-            const baseModules = await externalDataService.getRoadmapModules(goal);
+            // 2. Read Local Knowledge Base
+            const roleFilePath = path.join(process.cwd(), 'src/data/role.txt');
+            const skillFilePath = path.join(process.cwd(), 'src/data/skill.txt');
             
-            // 3. Prompt AI with the real data as context
-            const prompt = `User goal: ${goal}. 
-            Current skills: ${currentSkills.join(', ')}. 
-            
-            REAL-WORLD CONTEXT:
-            Average Salary: ${stats.avgSalary}
-            Job Demand: ${stats.jobDemand}
-            
-            Generate a 4-step professional roadmap to reach this goal. 
-            Each step must include a "learnItems" list of 3-5 specific sub-modules or learning objectives (e.g. "User research and personas", "Wireframing and prototyping").
-            
-            Return as a JSON object with keys: 
-            - salary: "${stats.avgSalary}"
-            - demand: "${stats.jobDemand}"
-            - estimated_duration: overall time (e.g. 6-12 months)
-            - roadmap: array of { title, description, platform, est_time, learnItems: ["Sub-module 1", "Sub-module 2"] }`;
+            let localContext = '';
+            try {
+                const roleData = fs.existsSync(roleFilePath) ? fs.readFileSync(roleFilePath, 'utf-8') : '';
+                const skillData = fs.existsSync(skillFilePath) ? fs.readFileSync(skillFilePath, 'utf-8') : '';
+                localContext = `KNOWLEDGE BASE DATA:\nROLES:\n${roleData}\n\nSKILLS:\n${skillData}`;
+            } catch (e: any) {
+                console.warn('[AI] Context file error:', e.message);
+            }
 
+            // 3. Prompt AI with few-shot examples
+            const prompt = `Goal: ${goal}
+            User Skills: ${currentSkills.join(', ')}
+            
+            ${localContext}
+
+            STRUCTURE EXAMPLE (Software Engineer):
+            Step 1: Core Fundamentals (Description: "Learn logic, variables, and loops.", learnItems: ["Variables", "State", "Hooks", "Logic Flow"], platform: "Enroute", est_time: "2 Weeks")
+
+            STRICT TASK: Generate a 4-step professional roadmap based on the Goal and User Skills. 
+            Each step MUST have: title, description (max 30 words), learnItems (4 distinct sub-topics), platform, est_time.
+
+            OUTPUT FORMAT (STRICT JSON ONLY):
+            {
+              "salary": "Range based on role",
+              "demand": "High/Medium",
+              "estimated_duration": "X Months",
+              "roadmap": [
+                { "title": "...", "description": "...", "platform": "...", "est_time": "...", "learnItems": ["...", "...", "...", "..."] },
+                ... (TOTAL 4 STEPS)
+              ]
+            }`;
+
+            console.log(`[AI] Generating roadmap for: "${goal}"`);
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
                 model: "meta-llama/Meta-Llama-3-8B-Instruct",
                 messages: [
-                    { role: 'system', content: 'You are an expert career path strategist. Output ONLY valid JSON with learning modules (learnItems) for each step.' },
+                    { role: 'system', content: 'You are an elite career development architect. You return ONLY the JSON object. Do not explain your logic.' },
                     { role: 'user', content: prompt }
                 ],
-                max_tokens: 1000,
+                max_tokens: 1500,
+                temperature: 0.1 // Low temperature for high precision JSON
             }, {
                 headers: { 'Authorization': `Bearer ${HF_API_KEY}` }
             });
 
             const content = response.data.choices[0].message.content;
-            const match = content?.match(/\{.*\}/s);
-            const roadmapResult = match ? JSON.parse(match[0]) : { roadmap: [] };
+            console.log(`[AI] Response Length: ${content?.length || 0} characters.`);
 
-            // 4. For each step, fetch real resources
-            const finalSteps = await Promise.all((roadmapResult.roadmap || []).slice(0, 4).map(async (step: any) => {
-                const videos = await externalDataService.getYoutubeVideos(step.title);
-                return {
-                    ...step,
-                    videos
-                };
+            const match = content?.match(/\{.*\}/s);
+            let roadmapResult: any = { roadmap: [] };
+            
+            if (match) {
+                try {
+                    roadmapResult = JSON.parse(match[0]);
+                } catch (e) {
+                    console.error('[AI] JSON Parse Failed. Response:', content);
+                }
+            } else {
+                console.error('[AI] No JSON block found in response');
+            }
+
+            // 4. Clean and slice for safety
+            const finalSteps = (roadmapResult.roadmap || roadmapResult.steps || []).slice(0, 4).map((step: any) => ({
+                ...step,
+                videos: [] 
             }));
 
+            console.log(`[AI] Successfully prepared ${finalSteps.length} steps.`);
+
             return {
-                ...roadmapResult,
+                salary: roadmapResult.salary || stats.avgSalary,
+                demand: roadmapResult.demand || stats.jobDemand,
+                estimated_duration: roadmapResult.estimated_duration || '6-12 Months',
                 roadmap: finalSteps
             };
 
         } catch (error: any) {
-            console.error('Roadmap Grounding Error:', error?.response?.data || error.message);
+            console.error('[AI] Roadmap Generation Error:', error?.response?.data || error.message);
             throw error;
         }
     },
