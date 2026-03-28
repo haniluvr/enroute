@@ -16,8 +16,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
   loading: true,
-  signOut: async () => {},
-  mockAdminLogin: () => {},
+  signOut: async () => { },
+  mockAdminLogin: () => { },
 });
 
 export const useAuth = () => {
@@ -30,7 +30,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Expose a mock admin login for development testing
   const mockAdminLogin = () => {
     setUser({ id: 'mock-admin-id', email: 'admin@gmail.com', role: 'authenticated' } as User);
     setRole('admin');
@@ -68,19 +67,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('role')
         .eq('id', userId)
         .single();
-      
+
       if (error) {
         // Fallback for hardcoded admin account
         if (currentUser.email === 'admin@gmail.com') {
-           setRole('admin');
+          setRole('admin');
         } else {
-           setRole(null);
+          setRole(null);
         }
       } else if (data) {
         setRole(data.role);
       }
     } catch (err) {
-       console.error('Unexpected error fetching role', err);
+      console.error('Unexpected error fetching role', err);
     } finally {
       setLoading(false);
     }
@@ -89,9 +88,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     // Check if it's the mock user
     if (user?.id === 'mock-admin-id') {
-       setUser(null);
-       setRole(null);
-       return;
+      setUser(null);
+      setRole(null);
+      return;
     }
     await supabase.auth.signOut();
   };
