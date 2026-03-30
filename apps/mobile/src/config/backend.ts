@@ -11,4 +11,7 @@ export const AI_API = {
     STT: `${BACKEND_URL}/api/ai/stt`,
     TTS: `${BACKEND_URL}/api/ai/tts`,
     ANALYZE_ASSESSMENT: `${BACKEND_URL}/api/ai/analyze-assessment`,
+    APPLY: `${BACKEND_URL}/api/jobs/apply`,
+    SEARCH_JOBS: `${BACKEND_URL}/api/jobs/search`,
+    SYNC_JOB: `${BACKEND_URL}/api/jobs/sync`,
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import tw from '@/lib/tailwind';
 import { GlassCard } from '@/components/GlassCard';
 import { MapPin, Briefcase } from 'lucide-react-native';
@@ -15,6 +15,7 @@ export interface CareerCardData {
     skills: string[];
     salary: string;
     color?: string;
+    company_logo?: string;
 }
 
 interface CareerCardProps {
@@ -67,9 +68,17 @@ export function CareerCard({ data }: CareerCardProps) {
             <View style={tw`p-8`}>
                 {/* Header: Company & Match */}
                 <View style={tw`flex-row justify-between items-start mb-7`}>
-                    <View style={tw`flex-row items-center`}>
-                        <View style={[tw`w-14 h-14 rounded-2xl bg-[#a78bfa20] items-center justify-center border border-violet-500/20`, { backgroundColor: data.color ? `${data.color}20` : '#a78bfa20' }]}>
-                            <Text style={[tw`text-violet-400 text-2xl font-inter-bold`, { color: data.color || '#a78bfa' }]}>{data.company.charAt(0)}</Text>
+                    <View style={tw`flex-row items-center flex-1 mr-4`}>
+                        <View style={[tw`w-14 h-14 rounded-2xl bg-[#a78bfa20] items-center justify-center border border-violet-500/20 overflow-hidden`, { backgroundColor: data.color ? `${data.color}20` : '#a78bfa20' }]}>
+                            {data.company_logo ? (
+                                <Image 
+                                    source={{ uri: data.company_logo }} 
+                                    style={tw`w-full h-full`}
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <Text style={[tw`text-violet-400 text-2xl font-inter-bold`, { color: data.color || '#a78bfa' }]}>{data.company.charAt(0)}</Text>
+                            )}
                         </View>
                         <View style={tw`ml-4`}>
                             <Text style={tw`text-white text-xl font-inter-bold`}>{data.company}</Text>

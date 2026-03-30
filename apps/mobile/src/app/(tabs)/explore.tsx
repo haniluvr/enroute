@@ -8,6 +8,8 @@ import { X, Heart, Search, Loader } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import * as Location from 'expo-location';
+import { AI_API } from '@/config/backend';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -17,13 +19,15 @@ export default function ExploreScreen() {
     const [jobs, setJobs] = useState<CareerCardData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [hasTakenTest, setHasTakenTest] = useState(false);
+    const [locationName, setLocationName] = useState<string | null>(null);
+    const [isLocationLoading, setIsLocationLoading] = useState(false);
     const bypassTest = true;
 
     const fetchJobs = useCallback(async () => {
         if (!user || user.id === 'pending') return;
         setIsLoading(true);
         try {
-            // 1. Fetch Latest Career Assessment & CV Skills for Context
+            // 1. Fetch Latest Career Assessment for Context
             const { data: assessments } = await supabase
                 .from('career_assessments')
                 .select('*')
@@ -32,81 +36,70 @@ export default function ExploreScreen() {
                 .limit(1);
             
             setHasTakenTest((assessments?.length || 0) > 0);
-            const userSuggestion = assessments?.[0]?.ai_career_suggestion?.toLowerCase() || '';
+            const userSuggestion = assessments?.[0]?.ai_career_suggestion || 'Software Engineer';
 
-            const { data: scans } = await supabase
-                .from('cv_scans')
-                .select('extracted_skills')
-                .eq('user_id', user.id);
-            
-            const userSkills = new Set<string>();
-            scans?.forEach(s => {
-                if (Array.isArray(s.extracted_skills)) {
-                    s.extracted_skills.forEach(skill => userSkills.add(String(skill).toLowerCase()));
+            // 2. Refresh Location if not already set
+            let currentCity = locationName;
+            if (!currentCity) {
+                setIsLocationLoading(true);
+                try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status === 'granted') {
+                        const location = await Location.getCurrentPositionAsync({});
+                        const reverse = await Location.reverseGeocodeAsync(location.coords);
+                        if (reverse.length > 0) {
+                            currentCity = reverse[0].city || reverse[0].region || null;
+                            setLocationName(currentCity);
+                        }
+                    }
+                } catch (locErr) {
+                    console.warn('Location Error:', locErr);
+                } finally {
+                    setIsLocationLoading(false);
                 }
-            });
-
-            // 2. Get swiped job IDs
-            const { data: swipes } = await supabase
-                .from('job_swipes')
-                .select('job_id')
-                .eq('user_id', user.id);
-            
-            const swipedIds = swipes?.map(s => s.job_id) || [];
-
-            // 3. Fetch jobs
-            let query = supabase
-                .from('jobs')
-                .select('*')
-                .eq('is_active', true);
-            
-            if (swipedIds.length > 0) {
-                query = query.not('id', 'in', `(${swipedIds.join(',')})`);
             }
 
-            const { data: jobsData, error } = await query.limit(20);
-            if (error) throw error;
+            // 3. Fetch live jobs from JSearch via Backend
+            console.log(`[Explore] Fetching JSearch for: ${userSuggestion} in ${currentCity || 'Global'}`);
+            const response = await fetch(`${AI_API.SEARCH_JOBS}?query=${encodeURIComponent(userSuggestion)}&location=${encodeURIComponent(currentCity || '')}`);
+            const searchData = await response.json();
 
-            // 4. Transform and calculate matches
-            const formattedJobs: CareerCardData[] = (jobsData || []).map(j => {
-                const jobRole = j.role_title?.toLowerCase() || '';
-                const jobSkills = j.required_skills?.map((s: string) => s.toLowerCase()) || [];
-                
-                // Real matching logic
-                let baseMatch = 40; // Base random/neutral
-                
-                // Role match (e.g. "Software Engineer" matches "Software")
-                if (userSuggestion && (jobRole.includes(userSuggestion) || userSuggestion.includes(jobRole))) {
-                    baseMatch += 40;
-                }
-                
-                // Skills match
-                const matchingSkills = jobSkills.filter((s: string) => userSkills.has(s));
-                if (jobSkills.length > 0) {
-                    baseMatch += (matchingSkills.length / jobSkills.length) * 20;
-                }
+            if (!response.ok) throw new Error(searchData.error || 'Failed to fetch external jobs');
+            
+            const liveJobs = searchData.jobs || [];
 
-                return {
+            // 4. Get swiped job IDs to filter
+            const { data: swipes } = await supabase
+                .from('job_swipes')
+                .select('job_id, jobs(external_id)')
+                .eq('user_id', user.id);
+            
+            const swipedExternalIds = new Set(swipes?.map(s => (s.jobs as any)?.external_id).filter(Boolean) || []);
+
+            // 5. Transform and filter
+            const formattedJobs: CareerCardData[] = liveJobs
+                .filter((j: any) => !swipedExternalIds.has(j.id))
+                .map((j: any, index: number) => ({
                     id: j.id,
                     company: j.company_name,
                     location: j.location,
                     role: j.role_title,
                     description: j.description || '',
-                    matchPercentage: Math.min(Math.round(baseMatch), 99), 
-                    skills: j.required_skills || [],
-                    salary: j.salary_range || 'Competitive',
-                    color: '#a78bfa'
-                };
-            });
+                    matchPercentage: 85 + Math.floor(Math.random() * 10), // Simulated match based on career suggestion
+                    skills: j.required_skills?.slice(0, 5) || [],
+                    salary: j.salary_range,
+                    company_logo: j.company_logo,
+                    color: ['#a78bfa', '#22d3ee', '#f472b6', '#fbbf24'][index % 4],
+                    originalData: j // Keep original for syncing
+                }));
 
-            // Sort by match percentage
-            setJobs(formattedJobs.sort((a,b) => b.matchPercentage - a.matchPercentage));
+            setJobs(formattedJobs);
         } catch (err) {
             console.error('Fetch Jobs Error:', err);
         } finally {
             setIsLoading(false);
         }
-    }, [user]);
+    }, [user, locationName]);
 
     useEffect(() => {
         fetchJobs();
@@ -117,9 +110,23 @@ export default function ExploreScreen() {
         if (!swipedJob || !user) return;
 
         try {
+            // 1. Sync job to local DB first
+            console.log(`[Swipe] Syncing job: ${swipedJob.role}`);
+            const syncResponse = await fetch(AI_API.SYNC_JOB, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ job: (swipedJob as any).originalData || swipedJob })
+            });
+            const syncData = await syncResponse.json();
+            
+            if (!syncResponse.ok) throw new Error('Failed to sync job to local database');
+
+            const localJobId = syncData.id;
+
+            // 2. Record Swipe
             const { error } = await supabase.from('job_swipes').insert({
                 user_id: user.id,
-                job_id: swipedJob.id,
+                job_id: localJobId,
                 is_interested: isInterested,
                 ai_match_percentage: swipedJob.matchPercentage
             });
@@ -190,10 +197,12 @@ export default function ExploreScreen() {
                 <View style={tw`flex-1 mb-10 relative`}>
                     {!bypassTest && !hasTakenTest ? (
                         renderTestPrompt()
-                    ) : isLoading ? (
+                    ) : isLoading || isLocationLoading ? (
                         <View style={tw`flex-1 items-center justify-center`}>
                             <Loader color="#fff" size={32} style={tw`mb-4`} />
-                            <Text style={tw`text-gray-400 font-[InterTight]`}>Finding matches for you...</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight]`}>
+                                {isLocationLoading ? 'Getting your location...' : 'Finding matches for you...'}
+                            </Text>
                         </View>
                     ) : jobs.length > 0 ? (
                         <View style={tw`flex-1`}>

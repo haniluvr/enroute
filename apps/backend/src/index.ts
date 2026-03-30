@@ -12,6 +12,8 @@ dotenv.config();
 
 import { aiService } from './services/aiService';
 import { sttService } from './services/sttService';
+import { externalDataService } from './services/externalDataService';
+import rateLimit from 'express-rate-limit';
 
 // Configure multer for audio uploads
 const upload = multer({ dest: 'uploads/' });
@@ -25,6 +27,13 @@ if (!fs.existsSync('uploads/')) {
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Rate Limiter for JSearch (Free tier protection)
+const jobSearchLimiter = rateLimit({
+    windowMs: 24 * 60 * 60 * 1000, // 24 hours
+    max: 10, // 10 requests per day per IP for testing
+    message: { error: 'Daily job search limit reached. Please try again tomorrow!' }
+});
 
 app.use((req, res, next) => {
     console.log(`\n📢 [API] >>> ${req.method} ${req.url} at ${new Date().toLocaleTimeString()} <<<`);
@@ -204,6 +213,150 @@ app.post('/api/ai/parse-cv', async (req, res) => {
     } catch (error: any) {
         console.error('CV Parse Endpoint Error:', error);
         res.status(500).json({ error: 'Failed to parse CV', details: error.message });
+    }
+});
+
+/**
+ * Job Application / Forwarding Endpoint
+ */
+app.post('/api/jobs/apply', async (req, res) => {
+    try {
+        const { userId, jobId, cvUrl } = req.body;
+        if (!userId || !jobId) return res.status(400).json({ error: 'Missing userId or jobId' });
+
+        console.log(`[Job Application] Process for User: ${userId} to Job: ${jobId}`);
+
+        // 1. Fetch Job details for forwarding
+        const { data: job, error: jobErr } = await supabase
+            .from('jobs')
+            .select('role_title, company_name, contact_email')
+            .eq('id', jobId)
+            .single();
+
+        if (jobErr || !job) throw new Error('Job not found');
+
+        // 2. Update Application Status (Upsert)
+        const { data: application, error: appErr } = await supabase
+            .from('job_applications')
+            .upsert({ 
+                user_id: userId, 
+                job_id: jobId, 
+                status: 'applied',
+                cv_url: cvUrl,
+                applied_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id,job_id' });
+
+        if (appErr) {
+            console.warn('[Job Application] Upsert error (likely missing unique constraint), trying insert:', appErr.message);
+            // Fallback for missing unique constraint: just insert if not exists
+            const { error: insertErr } = await supabase
+                .from('job_applications')
+                .insert({ 
+                    user_id: userId, 
+                    job_id: jobId, 
+                    status: 'applied',
+                    cv_url: cvUrl,
+                    applied_at: new Date().toISOString()
+                });
+            if (insertErr && !insertErr.message.includes('duplicate key')) throw insertErr;
+        }
+
+        // 3. Forward CV to Company (Network Simulation)
+        const recipient = job.contact_email || 'careers@enroute.dev';
+        console.log(`\n📢 [EMAIL FORWARDED] 📢`);
+        console.log(`TO: ${recipient}`);
+        console.log(`SUBJECT: New Application: ${job.role_title} via Enroute`);
+        console.log(`BODY: User ${userId} has applied for ${job.role_title}.`);
+        console.log(`ATTACHMENT: ${cvUrl || 'No CV linked'}`);
+        console.log(`-------------------------\n`);
+
+        res.json({ success: true, message: `Application forwarded to ${recipient}`, status: 'applied' });
+    } catch (error: any) {
+        console.error('Apply Endpoint Error:', error);
+        res.status(500).json({ error: 'Failed to process application', details: error.message });
+    }
+});
+
+/**
+ * Job Search External API Endpoint (Localized)
+ */
+app.get('/api/jobs/search', jobSearchLimiter, async (req, res) => {
+    try {
+        const { query, location } = req.query as { query: string, location?: string };
+        if (!query) return res.status(400).json({ error: 'Search query is required' });
+        
+        console.log(`[Job Search] Handling request: query="${query}", location="${location || 'Global'}"`);
+        const jobs = await externalDataService.searchJobs(query, location);
+        res.json({ jobs });
+    } catch (error: any) {
+        console.error('Job Search Error:', error);
+        res.status(500).json({ error: 'Failed to fetch jobs' });
+    }
+});
+
+/**
+ * Sync External Job to Local Database
+ */
+app.post('/api/jobs/sync', async (req, res) => {
+    try {
+        const { job } = req.body;
+        if (!job || !job.id) return res.status(400).json({ error: 'Missing job data' });
+
+        console.log(`[Sync] Syncing external job: ${job.role_title} for ${job.company_name}`);
+
+        // Upsert into local jobs table using external_id as unique key
+        const { data: syncedJob, error } = await supabase
+            .from('jobs')
+            .upsert({
+                role_title: job.role_title,
+                company_name: job.company_name,
+                location: job.location,
+                description: job.description,
+                required_skills: job.required_skills,
+                salary_range: job.salary_range,
+                company_logo: job.company_logo,
+                is_active: true,
+                external_id: job.id
+            }, { onConflict: 'external_id' })
+            .select()
+            .single();
+
+        if (error) {
+            console.warn('[Sync] Upsert error (possibly missing unique constraint):', error.message);
+            // Fallback: search by name/company if external_id fails
+            const { data: existing } = await supabase
+                .from('jobs')
+                .select('id')
+                .eq('role_title', job.role_title)
+                .eq('company_name', job.company_name)
+                .single();
+            
+            if (existing) return res.json({ id: existing.id });
+
+            const { data: inserted, error: insertErr } = await supabase
+                .from('jobs')
+                .insert({
+                    role_title: job.role_title,
+                    company_name: job.company_name,
+                    location: job.location,
+                    description: job.description,
+                    required_skills: job.required_skills,
+                    salary_range: job.salary_range,
+                    company_logo: job.company_logo,
+                    external_id: job.id
+                })
+                .select()
+                .single();
+            
+            if (insertErr) throw insertErr;
+            return res.json({ id: inserted.id });
+        }
+
+        res.json({ id: syncedJob.id });
+    } catch (error: any) {
+        console.error('Job Sync Error:', error);
+        res.status(500).json({ error: 'Failed to sync job', details: error.message });
     }
 });
 

@@ -60,15 +60,16 @@ export const externalDataService = {
                     ? salaries.reduce((a: number, b: number) => a + b, 0) / salaries.length 
                     : 0;
                 
-                // Estimate demand by total count (simple heuristic)
+                // Estimate demand
                 const count = data.count || 0;
                 let demand = 'Medium';
                 if (count > 5000) demand = 'Very High';
                 else if (count > 1000) demand = 'High';
                 else if (count < 100) demand = 'Low';
 
+                const currency = country === 'ph' ? '₱' : '$';
                 return {
-                    avgSalary: avg > 0 ? `$${Math.round(avg).toLocaleString()}` : 'Competitive',
+                    avgSalary: avg > 0 ? `${currency}${Math.round(avg).toLocaleString()}` : 'Competitive',
                     jobDemand: demand
                 };
             }
@@ -77,6 +78,19 @@ export const externalDataService = {
             console.error('Adzuna API Error:', error);
             return { avgSalary: 'Market Rate', jobDemand: 'Steady' };
         }
+    },
+
+    /**
+     * Resolve country code for Adzuna stats
+     */
+    resolveCountryCode(location?: string): string {
+        if (!location) return 'us';
+        const loc = location.toLowerCase();
+        if (loc.includes('philippines') || loc.includes('manila') || loc.includes('quezon city')) return 'ph';
+        if (loc.includes('united kingdom') || loc.includes('uk')) return 'gb';
+        if (loc.includes('canada') || loc.includes('ca')) return 'ca';
+        if (loc.includes('australia') || loc.includes('au')) return 'au';
+        return 'us'; // default
     },
 
     /**
@@ -145,6 +159,74 @@ export const externalDataService = {
             return new Date().toLocaleDateString();
         } catch (error) {
             return new Date().toLocaleDateString();
+        }
+    },
+
+    /**
+     * Fetch jobs from JSearch (RapidAPI)
+     */
+    async searchJobs(query: string, location?: string): Promise<any[]> {
+        try {
+            const JSEARCH_API_KEY = process.env.JSEARCH_API_KEY;
+            const JSEARCH_API_HOST = process.env.JSEARCH_API_HOST;
+
+            if (!JSEARCH_API_KEY) {
+                console.error('JSearch API Key Missing');
+                return [];
+            }
+
+            const searchQuery = location ? `${query} in ${location}` : query;
+            console.log(`[JSearch] Querying: "${searchQuery}"`);
+
+            // Fetch Market stats for fallback once
+            const countryCode = this.resolveCountryCode(location);
+            const marketStats = await this.getJobStats(query, countryCode);
+
+            const options = {
+                method: 'GET',
+                url: 'https://jsearch.p.rapidapi.com/search',
+                params: {
+                    query: searchQuery,
+                    page: '1',
+                    num_pages: '1'
+                },
+                headers: {
+                    'x-rapidapi-key': JSEARCH_API_KEY,
+                    'x-rapidapi-host': JSEARCH_API_HOST
+                }
+            };
+
+            const response = await axios.request(options);
+            return (response.data.data || []).map((j: any) => {
+                // Determine Salary string
+                let salary = `Est. ${marketStats.avgSalary}`; // Start with market estimate as default
+                if (j.job_min_salary) {
+                    const currency = j.job_salary_currency || '$';
+                    const period = (j.job_salary_period || '').toLowerCase();
+                    salary = `${currency}${j.job_min_salary.toLocaleString()}`;
+                    if (j.job_max_salary && j.job_max_salary !== j.job_min_salary) {
+                        salary += ` - ${currency}${j.job_max_salary.toLocaleString()}`;
+                    }
+                    if (period === 'month') salary += '/mo';
+                    else if (period === 'year') salary += '/yr';
+                    else if (period === 'hour') salary += '/hr';
+                }
+
+                return {
+                    id: j.job_id,
+                    role_title: j.job_title,
+                    company_name: j.employer_name,
+                    company_logo: j.employer_logo,
+                    location: `${j.job_city || ''} ${j.job_state || ''}, ${j.job_country || ''}`.trim().replace(/^, /, ''),
+                    description: j.job_description || '',
+                    required_skills: j.job_highlights?.Qualifications || [],
+                    salary_range: salary,
+                    external_url: j.job_apply_link
+                };
+            });
+        } catch (error) {
+            console.error('JSearch API Error:', error);
+            return [];
         }
     },
 

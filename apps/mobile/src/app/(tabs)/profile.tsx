@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
-import { Settings, Pencil, Trophy, BookOpen, Map, Send, Star, Briefcase, Target, GraduationCap, Route, Mail, RefreshCw } from 'lucide-react-native';
+import { Settings, Pencil, Trophy, BookOpen, Map, Send, Star, Briefcase, Target, GraduationCap, Route, Mail, RefreshCw, ChevronRight } from 'lucide-react-native';
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
@@ -303,6 +303,22 @@ export default function ProfileScreen() {
                             ))}
                         </View>
                     </GlassCard>
+ 
+                    {/* Career Swipe Matches Button */}
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => router.push('/job-matches')}
+                        style={tw`mb-6 h-[72px] bg-white/5 border border-white/10 rounded-[32px] overflow-hidden flex-row items-center px-6`}
+                    >
+                        <View style={tw`w-12 h-12 rounded-2xl bg-[#22d3ee20] items-center justify-center mr-4`}>
+                            <Briefcase color="#22d3ee" size={24} />
+                        </View>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-white font-[InterTight-Bold] text-[17px]`}>Career Swipe Matches</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>Manage your job interests & applications</Text>
+                        </View>
+                        <ChevronRight color="#888" size={20} />
+                    </TouchableOpacity>
 
                     {/* Email Verification Card - Only shown if not verified */}
                     {!isVerified && (

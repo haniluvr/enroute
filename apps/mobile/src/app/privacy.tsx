@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Switch, Alert, Linking, AppState } from 'react-native';
+import * as Location from 'expo-location';
 import { Shield, ChevronLeft, Key, Eye, UserX, ChevronRight, Lock, MapPin } from 'lucide-react-native';
 import tw from '@/lib/tailwind';
 import { GlassCard } from '@/components/GlassCard';
@@ -46,6 +47,75 @@ export default function PrivacyScreen() {
     const [twoFactor, setTwoFactor] = useState(false);
     const [dataSharing, setDataSharing] = useState(true);
     const [shareLocation, setShareLocation] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    const checkLocationPermission = async () => {
+        try {
+            const { status } = await Location.getForegroundPermissionsAsync();
+            setShareLocation(status === 'granted');
+        } catch (error) {
+            console.warn('Error checking location permission:', error);
+        }
+    };
+
+    useEffect(() => {
+        checkLocationPermission();
+
+        // Sync with system settings if user returns from backgrounds
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (nextAppState === 'active') {
+                checkLocationPermission();
+            }
+        });
+
+        return () => subscription.remove();
+    }, []);
+
+    const handleLocationToggle = async (value: boolean) => {
+        if (isUpdating) return;
+        setIsUpdating(true);
+        
+        try {
+            if (value) {
+                // Request Permission
+                const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+                
+                if (status === 'granted') {
+                    setShareLocation(true);
+                } else {
+                    setShareLocation(false);
+                    if (!canAskAgain) {
+                        Alert.alert(
+                            "Permission Denied",
+                            "Location access is permanently disabled. Please enable it in your device settings to use this feature.",
+                            [
+                                { text: "Cancel", style: "cancel" },
+                                { text: "Open Settings", onPress: () => Linking.openSettings() }
+                            ]
+                        );
+                    }
+                }
+            } else {
+                // Inform user how to revoke
+                Alert.alert(
+                    "Revoke Permission",
+                    "To completely disable location access, please turn it off in your device System Settings.",
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        { text: "Open Settings", onPress: () => Linking.openSettings() },
+                        { 
+                            text: "Disable in App", 
+                            onPress: () => setShareLocation(false) 
+                        }
+                    ]
+                );
+            }
+        } catch (error) {
+            console.error('Error handling location toggle:', error);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
@@ -122,8 +192,9 @@ export default function PrivacyScreen() {
                                 <Switch
                                     trackColor={{ false: '#3e3e3e', true: '#34C759' }}
                                     thumbColor={shareLocation ? '#ffffff' : '#f4f3f4'}
-                                    onValueChange={setShareLocation}
+                                    onValueChange={handleLocationToggle}
                                     value={shareLocation}
+                                    disabled={isUpdating}
                                 />
                             </View>
                         </GlassCard>

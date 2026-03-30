@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import { HfInference } from '@huggingface/inference';
 import { externalDataService } from './externalDataService';
 const pdf = require('pdf-parse');
+// Some versions/environments export the function as .default
+const parsePdf = typeof pdf === 'function' ? pdf : pdf.default;
 
 import fs from 'fs';
 import path from 'path';
@@ -234,7 +236,7 @@ export const aiService = {
         try {
             console.log(`[AI] Extracting text from PDF: ${fileUrl}`);
             const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
-            const data = await pdf(response.data);
+            const data = await parsePdf(response.data);
             return data.text;
         } catch (error: any) {
             console.error('PDF Extraction Error:', error.message);
