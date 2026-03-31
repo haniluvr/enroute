@@ -129,10 +129,6 @@ export const Login = () => {
               )}
             </button>
           </div>
-          
-          <div className="mt-4 text-center text-xs text-gray-500">
-            For development preview, use <span className="font-mono text-violet-400">admin@gmail.com</span> / <span className="font-mono text-violet-400">admin123</span>
-          </div>
         </form>
       </div>
     </div>

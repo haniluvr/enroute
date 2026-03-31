@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { createClient } from '@supabase/supabase-js';
+import aiRoutes from './routes/ai';
+import adminRoutes from './routes/admin';
 
 // Load environment variables
 dotenv.config();
@@ -19,6 +20,10 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER
 app.get('/api/health', (req, res) => {
     res.json({ status: 'healthy', service: 'Enroute AI Backend' });
 });
+
+// App Routers
+app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
