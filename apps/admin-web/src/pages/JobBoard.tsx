@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Search, ExternalLink, RefreshCw, Send } from 'lucide-react';
+import { Briefcase, Search, ExternalLink, RefreshCw, Send, Users } from 'lucide-react';
 import { MassBlastModal } from '../components/MassBlastModal';
+import { ApplicantViewerModal } from '../components/ApplicantViewerModal';
 
 export const JobBoard = () => {
     const [query, setQuery] = useState('Software Engineer');
@@ -11,6 +12,7 @@ export const JobBoard = () => {
     const [cooldown, setCooldown] = useState(false);
     
     const [blastJob, setBlastJob] = useState<any | null>(null);
+    const [viewApplicantJob, setViewApplicantJob] = useState<any | null>(null);
 
     const searchJobs = async () => {
         if (!query.trim() || cooldown) return;
@@ -124,22 +126,30 @@ export const JobBoard = () => {
                             {job.job_description || "No description provided."}
                         </p>
 
-                        <div className="flex items-center gap-2 pt-4 border-t border-white/5 mt-auto relative z-10">
+                        <div className="flex flex-col gap-2 pt-4 border-t border-white/5 mt-auto relative z-10">
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => setBlastJob(job)}
+                                    className="flex-1 text-center py-2.5 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/20 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <Send size={14} /> Mass Blast
+                                </button>
+                                <a 
+                                    href={job.job_apply_link} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="px-4 py-2.5 rounded-xl bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center shadow-sm"
+                                    title="View details"
+                                >
+                                    <ExternalLink size={16} />
+                                </a>
+                            </div>
                             <button 
-                                onClick={() => setBlastJob(job)}
-                                className="flex-1 text-center py-2.5 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/20 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm"
+                                onClick={() => setViewApplicantJob(job)}
+                                className="w-full text-center py-2.5 rounded-xl bg-violet-600/10 text-violet-400 border border-violet-500/20 hover:bg-violet-600 hover:border-violet-500 hover:text-white transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm mt-1"
                             >
-                                <Send size={14} /> Mass Blast
+                                <Users size={14} /> View Applicants
                             </button>
-                            <a 
-                                href={job.job_apply_link} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="px-4 py-2.5 rounded-xl bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center shadow-sm"
-                                title="View details"
-                            >
-                                <ExternalLink size={16} />
-                            </a>
                         </div>
                         <div className="absolute -right-16 -bottom-16 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors"></div>
                     </div>
@@ -160,6 +170,13 @@ export const JobBoard = () => {
                 jobTitle={blastJob?.job_title || ''}
                 employer={blastJob?.employer_name || ''}
                 jobLink={blastJob?.job_apply_link || ''}
+            />
+
+            <ApplicantViewerModal 
+                isOpen={!!viewApplicantJob}
+                onClose={() => setViewApplicantJob(null)}
+                jobTitle={viewApplicantJob?.job_title || ''}
+                employer={viewApplicantJob?.employer_name || ''}
             />
         </div>
     );

@@ -6,23 +6,22 @@ async function createAdminUser() {
 
   console.log(`Setting up admin account for: ${email}`);
 
-  // Try to create the user
+
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email: email,
     password: password,
-    email_confirm: true, // Auto-confirm the email
+    email_confirm: true,
   });
 
   if (error) {
     if (error.message.includes('already been registered')) {
-        console.log(`User ${email} already exists. Updating password...`);
-        // If they exist, update their password to ensure it is correct
-        const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
-        const existingUser = usersData.users.find(u => u.email === email);
-        if (existingUser) {
-           await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { password: password });
-           console.log(`Password updated successfully for ${email}.`);
-        }
+      console.log(`User ${email} already exists. Updating password...`);
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+      const existingUser = usersData.users.find(u => u.email === email);
+      if (existingUser) {
+        await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { password: password });
+        console.log(`Password updated successfully for ${email}.`);
+      }
     } else {
       console.error('Failed to create admin user:', error);
     }
