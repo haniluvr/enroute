@@ -1,7 +1,7 @@
 import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
 import { Tabs } from 'expo-router';
 import { useColorScheme, Platform } from 'react-native';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Home, Map, Compass, User } from 'lucide-react-native';
 import LogoIcon from '@/assets/logo.svg';
 
@@ -9,8 +9,11 @@ export default function TabLayout() {
     const colorScheme = useColorScheme();
 
     if (Platform.OS === 'ios') {
+        const { DarkTheme: navDarkTheme, DefaultTheme: navDefaultTheme } = require('@react-navigation/native');
+        const theme = colorScheme === 'dark' ? navDarkTheme : navDefaultTheme;
+        
         return (
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <ThemeProvider value={theme}>
                 <NativeTabs>
                     <NativeTabs.Trigger name="home">
                         <Label>Home</Label>

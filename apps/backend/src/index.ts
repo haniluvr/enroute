@@ -81,9 +81,9 @@ app.get('/api/health', async (req, res) => {
  */
 app.post('/api/ai/chat', async (req, res) => {
     try {
-        const { persona, history } = req.body;
-        console.log(`Chat request for persona: ${persona}, history length: ${history?.length}`);
-        const response = await aiService.generateCoachResponse(persona, history);
+        const { persona, history, isCall } = req.body;
+        console.log(`Chat request for persona: ${persona}, history length: ${history?.length}, isCall: ${!!isCall}`);
+        const response = await aiService.generateCoachResponse(persona, history, !!isCall);
         console.log('Chat response generated successfully');
         res.json({ response });
     } catch (error: any) {
@@ -153,14 +153,32 @@ app.post('/api/ai/stt', upload.single('audio'), async (req, res) => {
  */
 app.post('/api/ai/tts', async (req, res) => {
     try {
-        const { text } = req.body;
-        console.log(`TTS Request received for text: "${text.substring(0, 30)}..."`);
-        const audioUri = await aiService.generateTTS(text);
+        const { text, voice } = req.body;
+        console.log(`TTS Request received for text: "${text.substring(0, 30)}..." (Voice: ${voice || 'default'})`);
+        const audioUri = await aiService.generateTTS(text, voice);
         console.log('TTS URI generated successfully, sending to client');
         res.json({ audioUri });
     } catch (error) {
         console.error('TTS Endpoint Error:', error);
         res.status(500).json({ error: 'Failed to generate speech' });
+    }
+});
+
+/**
+ * Conversation Summary Endpoint
+ */
+app.post('/api/ai/summarize', async (req, res) => {
+    try {
+        const { history } = req.body;
+        if (!history || !Array.isArray(history)) {
+            return res.status(400).json({ error: 'Invalid history provided' });
+        }
+        console.log(`Summarizing session with ${history.length} messages...`);
+        const summary = await aiService.generateSummary(history);
+        res.json(summary);
+    } catch (error: any) {
+        console.error('Summarize endpoint error:', error.message);
+        res.status(500).json({ error: 'Failed to generate summary' });
     }
 });
 
@@ -283,11 +301,16 @@ app.post('/api/jobs/apply', async (req, res) => {
  */
 app.get('/api/jobs/search', jobSearchLimiter, async (req, res) => {
     try {
-        const { query, location } = req.query as { query: string, location?: string };
+        const { query, location, employment_types, job_requirements } = req.query as { 
+            query: string, 
+            location?: string,
+            employment_types?: string,
+            job_requirements?: string
+        };
         if (!query) return res.status(400).json({ error: 'Search query is required' });
         
-        console.log(`[Job Search] Handling request: query="${query}", location="${location || 'Global'}"`);
-        const jobs = await externalDataService.searchJobs(query, location);
+        console.log(`[Job Search] Handling request: query="${query}", location="${location || 'Global'}", emp="${employment_types}", req="${job_requirements}"`);
+        const jobs = await externalDataService.searchJobs(query, location, employment_types, job_requirements);
         res.json({ jobs });
     } catch (error: any) {
         console.error('Job Search Error:', error);
@@ -309,8 +332,8 @@ app.post('/api/jobs/sync', async (req, res) => {
         const { data: syncedJob, error } = await supabase
             .from('jobs')
             .upsert({
-                role_title: job.role_title,
-                company_name: job.company_name,
+                role_title: job.role_title || job.role,
+                company_name: job.company_name || job.company,
                 location: job.location,
                 description: job.description,
                 required_skills: job.required_skills,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
-import { Settings, Pencil, Trophy, BookOpen, Map, Send, Star, Briefcase, Target, GraduationCap, Route, Mail, RefreshCw, ChevronRight } from 'lucide-react-native';
+import { Settings, Pencil, Trophy, BookOpen, Map, Send, Star, Briefcase, Target, GraduationCap, Route, Mail, RefreshCw, ChevronRight, FileText } from 'lucide-react-native';
+
 import tw from '@/lib/tailwind';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
@@ -26,13 +27,14 @@ const SKILLS = [
 ].sort((a, b) => b.progress - a.progress);
 
 const ACHIEVEMENTS = [
-    { title: 'First Match', icon: Trophy, color: '#FCD34D' },
-    { title: 'Learner', icon: BookOpen, color: '#60A5FA' },
-    { title: 'Roadmap Set', icon: Map, color: '#34D399' },
-    { title: 'Applied', icon: Send, color: '#F87171' },
-    { title: 'Top 10%', icon: Star, color: '#A78BFA' },
-    { title: 'Hired!', icon: Briefcase, color: '#F472B6' },
+    { id: 'first_match', title: 'First Match', icon: Trophy, color: '#FCD34D' },
+    { id: 'learner', title: 'Learner', icon: BookOpen, color: '#60A5FA' },
+    { id: 'roadmap_set', title: 'Roadmap Set', icon: Map, color: '#34D399' },
+    { id: 'applied', title: 'Applied', icon: Send, color: '#F87171' },
+    { id: 'top_10', title: 'Top 10%', icon: Star, color: '#A78BFA' },
+    { id: 'hired', title: 'Hired!', icon: Briefcase, color: '#F472B6' },
 ];
+
 
 const getProgressColor = (progress: number) => {
     if (progress >= 80) return '#fcfcfccc'; // cyan
@@ -52,7 +54,10 @@ export default function ProfileScreen() {
     
     // Real dynamic data states
     const [stats, setStats] = useState(STATS);
-    const [skills, setSkills] = useState(SKILLS);
+    const [skills, setSkills] = useState<any[]>([]);
+    const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+    const [isLoadingSkills, setIsLoadingSkills] = useState(true);
+
 
     const isVerified = user?.email_confirmed_at != null;
 
@@ -168,45 +173,155 @@ export default function ProfileScreen() {
                 .order('created_at', { ascending: false })
                 .limit(1);
             
-            // 2. Fetch CV Scans for Skills
-            const { data: scans } = await supabase
-                .from('cv_scans')
-                .select('extracted_skills')
+            // 2. Fetch Skills from Roadmaps
+            const { data: roadmaps } = await supabase
+                .from('roadmaps')
+                .select('target_role, steps')
+                .eq('user_id', user.id);
+
+
+            // 3. Fetch Achievements & Ranking
+            const { count: swipeCount } = await supabase
+                .from('job_swipes')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id);
+
+            const { count: matchRightCount } = await supabase
+                .from('job_swipes')
+                .select('*', { count: 'exact', head: true })
                 .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+                .eq('is_interested', true);
+
+            const { count: completedModulesCount } = await supabase
+                .from('user_module_completions')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id);
+
+            const { count: applicationCount } = await supabase
+                .from('job_applications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id);
+
+            const { count: hiredCount } = await supabase
+                .from('job_applications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .eq('status', 'hired');
+
+            // Top 10% Ranking Logic
+            const { count: totalUsers } = await supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true });
+
+            const { data: rankings } = await supabase
+                .rpc('get_user_match_rankings');
+
+            let isTop10 = false;
+            if (rankings && totalUsers) {
+                const myRankEntry = rankings.find((r: any) => r.user_id === user.id);
+                if (myRankEntry) {
+                    const threshold = Math.max(1, Math.ceil(totalUsers * 0.10));
+                    isTop10 = myRankEntry.rank <= threshold;
+                }
+            } else {
+                // Final fallback to metadata if RPC/totalUsers fail
+                isTop10 = user.user_metadata?.is_top_percentile || false;
+            }
+
+            const unlocked = [];
+            if (swipeCount && swipeCount > 0) unlocked.push('first_match');
+            if (completedModulesCount && completedModulesCount > 0) unlocked.push('learner');
+            if (roadmaps && roadmaps.length > 0) unlocked.push('roadmap_set');
+            if (applicationCount && applicationCount > 0) unlocked.push('applied');
+            if (isTop10) unlocked.push('top_10');
+            if (hiredCount && hiredCount > 0) unlocked.push('hired');
+
+            setUnlockedAchievements(unlocked);
+
+            setIsLoadingSkills(true);
+            const baseSkills = new Set<string>();
+            
+            roadmaps?.forEach(r => {
+                if (r.target_role) baseSkills.add(r.target_role);
+                // Extract skills from roadmap steps if they exist
+                if (Array.isArray(r.steps)) {
+                    r.steps.forEach((step: any) => {
+                        if (step.label) baseSkills.add(step.label);
+                    });
+                }
+            });
+
+            // Calculate Roadmap Completion %
+            // (Sum of all completed modules for roadmap skills / Sum of all modules for those skills)
+            let overallProgress = 0;
+            const { data: moduleStats } = await supabase
+                .from('learning_modules')
+                .select('skill_name, id');
+            
+            const { data: userCompletions } = await supabase
+                .from('user_module_completions')
+                .select('module_id')
+                .eq('user_id', user.id);
+
+            const completedIds = new Set(userCompletions?.map(c => c.module_id) || []);
+
+            if (baseSkills.size > 0) {
+                let totalModulesCount = 0;
+                let totalCompletedCount = 0;
+
+                baseSkills.forEach(skillName => {
+                    const skillModules = moduleStats?.filter(m => m.skill_name === skillName) || [];
+                    totalModulesCount += skillModules.length;
+                    totalCompletedCount += skillModules.filter(m => completedIds.has(m.id)).length;
+                });
+
+                overallProgress = totalModulesCount > 0 ? Math.round((totalCompletedCount / totalModulesCount) * 100) : 0;
+            }
 
             // Update Stats
             setStats(prev => {
                 const newStats = [...prev];
+                // 1. Top Match (Career Assessment Score)
                 if (assessments && assessments.length > 0) {
                     newStats[0] = { ...newStats[0], value: `${assessments[0].match_percentage}%` };
                 }
+
+                // 2. Active Courses (Count of unique path titles in Roadmaps)
+                const activePaths = new Set(roadmaps?.map(r => r.target_role) || []);
+                newStats[1] = { ...newStats[1], label: 'Courses', value: `${activePaths.size}` };
+
+                // 3. Roadmap Completion %
+                newStats[2] = { ...newStats[2], label: 'Roadmap', value: `${overallProgress}%` };
+                
                 return newStats;
             });
 
-            // Aggregate skills from all CV scans
-            if (scans && scans.length > 0) {
-                const allSkills: string[] = [];
-                scans.forEach(s => {
-                    if (Array.isArray(s.extracted_skills)) {
-                        allSkills.push(...s.extracted_skills);
-                    }
-                });
-                
-                // Unique skills with mock progress for UI (until we have real progress tracking)
-                const uniqueSkills = Array.from(new Set(allSkills));
-                const formattedSkills = uniqueSkills.map((name, idx) => ({
-                    id: String(idx + 1),
-                    name,
-                    progress: Math.floor(Math.random() * 40) + 60 // Mocking some proficiency for viz
-                })).sort((a,b) => b.progress - a.progress);
-                
-                if (formattedSkills.length > 0) setSkills(formattedSkills);
+
+            if (baseSkills.size > 0) {
+                const skillProgress = Array.from(baseSkills).map((skillName, idx) => {
+                    const skillModules = moduleStats?.filter(m => m.skill_name === skillName) || [];
+                    const total = skillModules.length;
+                    const completed = skillModules.filter(m => completedIds.has(m.id)).length;
+                    
+                    return {
+                        id: String(idx + 1),
+                        name: skillName,
+                        progress: total > 0 ? Math.round((completed / total) * 100) : 0
+                    };
+                }).sort((a, b) => b.progress - a.progress);
+
+                setSkills(skillProgress);
+            } else {
+                setSkills([]);
             }
+
         } catch (err) {
             console.error('Error fetching real profile data:', err);
+        } finally {
+            setIsLoadingSkills(false);
         }
     };
+
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -303,22 +418,6 @@ export default function ProfileScreen() {
                             ))}
                         </View>
                     </GlassCard>
- 
-                    {/* Career Swipe Matches Button */}
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => router.push('/job-matches')}
-                        style={tw`mb-6 h-[72px] bg-white/5 border border-white/10 rounded-[32px] overflow-hidden flex-row items-center px-6`}
-                    >
-                        <View style={tw`w-12 h-12 rounded-2xl bg-[#22d3ee20] items-center justify-center mr-4`}>
-                            <Briefcase color="#22d3ee" size={24} />
-                        </View>
-                        <View style={tw`flex-1`}>
-                            <Text style={tw`text-white font-[InterTight-Bold] text-[17px]`}>Career Swipe Matches</Text>
-                            <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>Manage your job interests & applications</Text>
-                        </View>
-                        <ChevronRight color="#888" size={20} />
-                    </TouchableOpacity>
 
                     {/* Email Verification Card - Only shown if not verified */}
                     {!isVerified && (
@@ -359,60 +458,128 @@ export default function ProfileScreen() {
                         </GlassCard>
                     )}
 
+                    {/* Career Swipe Matches Button */}
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => router.push('/job-matches')}
+                        style={tw`mb-6 bg-white/5 border border-white/10 rounded-3xl overflow-hidden flex-row items-center px-6 py-5`}
+                    >
+                        <View style={tw`w-12 h-12 rounded-2xl bg-[#22d3ee20] items-center justify-center mr-4`}>
+                            <Briefcase color="#22d3ee" size={24} />
+                        </View>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-white font-[InterTight-Bold] text-[17px]`}>Career Swipe Matches</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>Manage your job interests & applications</Text>
+                        </View>
+                        <ChevronRight color="#888" size={20} />
+                    </TouchableOpacity>
+
+                    {/* Create CV Button */}
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => router.push('/create-cv')}
+                        style={tw`mb-6 bg-white/5 border border-white/10 rounded-3xl overflow-hidden flex-row items-center px-6 py-5`}
+                    >
+                        <View style={tw`w-12 h-12 rounded-2xl bg-[#a78bfa20] items-center justify-center mr-4`}>
+                            <FileText color="#a78bfa" size={24} />
+                        </View>
+                        <View style={tw`flex-1`}>
+                            <Text style={tw`text-white font-[InterTight-Bold] text-[17px]`}>Create CV</Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] text-sm`}>Build a professional resume with Dahlia AI</Text>
+                        </View>
+                        <ChevronRight color="#888" size={20} />
+                    </TouchableOpacity>
+
+
                     {/* Top Skills */}
                     <GlassCard noPadding style={tw`mb-6 p-6 bg-white/5`}>
                         <View style={tw`flex-row items-center justify-between mb-6`}>
                             <Text style={tw`text-white text-lg font-[InterTight-Bold]`}>Top Skills</Text>
-                            {hasMoreSkills && (
-                                <TouchableOpacity>
+                            {skills.length > 0 && (
+                                <TouchableOpacity onPress={() => router.push('/skills-progress')}>
                                     <Text style={tw`text-white text-sm font-[InterTight-Medium]`}>View all</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
 
-                        {skills.slice(0, 4).map((skill, index) => (
-                            <View key={skill.id} style={tw`${index !== 0 ? 'mt-6' : ''}`}>
-                                <View style={tw`flex-row justify-between items-center mb-2.5`}>
-                                    <Text style={tw`text-white/90 text-base font-[InterTight-Medium]`}>{skill.name}</Text>
-                                    <Text style={tw`text-white/50 text-sm font-[InterTight]`}>{skill.progress}%</Text>
+                        {isLoadingSkills ? (
+                            <View style={tw`py-4 items-center`}>
+                                <RefreshCw color="#666" size={20} style={tw`opacity-50`} />
+                            </View>
+                        ) : skills.length > 0 ? (
+                            skills.slice(0, 4).map((skill, index) => (
+                                <View key={skill.id} style={tw`${index !== 0 ? 'mt-6' : ''}`}>
+                                    <View style={tw`flex-row justify-between items-center mb-2.5`}>
+                                        <Text style={tw`text-white/90 text-base font-[InterTight-Medium]`}>{skill.name}</Text>
+                                        <Text style={tw`text-white/50 text-sm font-[InterTight]`}>{skill.progress}%</Text>
+                                    </View>
+                                    <View style={tw`h-1.5 w-full bg-white/10 rounded-full overflow-hidden`}>
+                                        <View
+                                            style={[
+                                                tw`h-full rounded-full`,
+                                                {
+                                                    width: `${skill.progress}%`,
+                                                    backgroundColor: getProgressColor(skill.progress),
+                                                }
+                                            ]}
+                                        />
+                                    </View>
                                 </View>
-                                <View style={tw`h-1.5 w-full bg-white/10 rounded-full overflow-hidden`}>
-                                    <View
-                                        style={[
-                                            tw`h-full rounded-full`,
-                                            {
-                                                width: `${skill.progress}%`,
-                                                backgroundColor: getProgressColor(skill.progress),
-                                            }
-                                        ]}
-                                    />
+                            ))
+                        ) : (
+                            <View style={tw`py-4`}>
+                                <Text style={tw`text-gray-400 font-[InterTight] text-sm leading-5 mb-4`}>
+                                    Please choose skills from Path or build a Roadmap to track your growth!
+                                </Text>
+                                <View style={tw`flex-row gap-3`}>
+                                    <TouchableOpacity
+                                        onPress={() => router.push('/(tabs)/path')}
+                                        style={tw`bg-white/10 px-4 py-2.5 rounded-xl border border-white/10`}
+                                    >
+                                        <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>Explore Path</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => router.push('/roadmap')}
+                                        style={tw`bg-white/10 px-4 py-2.5 rounded-xl border border-white/10`}
+                                    >
+                                        <Text style={tw`text-white font-[InterTight-Medium] text-xs`}>Build Roadmap</Text>
+                                    </TouchableOpacity>
                                 </View>
                             </View>
-                        ))}
+                        )}
+
+
                     </GlassCard>
 
                     {/* Achievements */}
                     <GlassCard noPadding style={tw`mb-8 p-6 pb-0 bg-white/5`}>
                         <View style={tw`flex-row items-center justify-between mb-3`}>
                             <Text style={tw`text-white text-lg font-[InterTight-Bold]`}>Achievements</Text>
-                            <Text style={tw`text-white/30 text-sm font-[InterTight]`}>6/6</Text>
+                            <Text style={tw`text-white/30 text-sm font-[InterTight]`}>
+                                {unlockedAchievements.length}/{ACHIEVEMENTS.length}
+                            </Text>
                         </View>
 
+
                         <View style={tw`flex-row flex-wrap justify-between`}>
-                            {ACHIEVEMENTS.map((achievement, idx) => (
-                                <View
-                                    key={idx}
-                                    style={tw`w-[31%] aspect-square bg-white/5 border border-white/5 rounded-2xl items-center justify-center mt-3`}
-                                >
-                                    <View style={[tw`w-10 h-10 rounded-full items-center justify-center mb-2`, { backgroundColor: `${achievement.color}15` }]}>
-                                        <achievement.icon size={20} color={achievement.color} />
+                            {ACHIEVEMENTS.map((achievement, idx) => {
+                                const isUnlocked = unlockedAchievements.includes(achievement.id);
+                                return (
+                                    <View
+                                        key={idx}
+                                        style={tw`w-[31%] aspect-square bg-white/5 border border-white/5 rounded-2xl items-center justify-center mt-3 ${!isUnlocked ? 'opacity-20' : ''}`}
+                                    >
+                                        <View style={[tw`w-10 h-10 rounded-full items-center justify-center mb-2`, { backgroundColor: isUnlocked ? `${achievement.color}15` : 'rgba(255,255,255,0.1)' }]}>
+                                            <achievement.icon size={20} color={isUnlocked ? achievement.color : '#fff'} />
+                                        </View>
+                                        <Text style={tw`${isUnlocked ? 'text-white/80' : 'text-white/40'} text-[10px] font-[InterTight-Medium] text-center px-1`} numberOfLines={1}>
+                                            {achievement.title}
+                                        </Text>
                                     </View>
-                                    <Text style={tw`text-white/80 text-[10px] font-[InterTight-Medium] text-center px-1`} numberOfLines={1}>
-                                        {achievement.title}
-                                    </Text>
-                                </View>
-                            ))}
+                                );
+                            })}
                         </View>
+
                     </GlassCard>
 
 

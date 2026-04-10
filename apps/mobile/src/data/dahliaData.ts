@@ -5,6 +5,7 @@ export interface Persona {
     description: string;
     type: 'Warm' | 'Direct' | 'Strategic';
     icon: 'neutral' | 'male' | 'female';
+    avatar: any;
 }
 
 export const PERSONAS: Persona[] = [
@@ -15,6 +16,7 @@ export const PERSONAS: Persona[] = [
         description: 'Encouraging, asks reflective questions to help you grow',
         type: 'Warm',
         icon: 'neutral',
+        avatar: require('@/assets/avatars/dahlia.png'),
     },
     {
         id: 'alex',
@@ -23,6 +25,7 @@ export const PERSONAS: Persona[] = [
         description: 'Direct and focused on technical career growth paths',
         type: 'Direct',
         icon: 'male',
+        avatar: require('@/assets/avatars/alex.png'),
     },
     {
         id: 'susan',
@@ -31,6 +34,7 @@ export const PERSONAS: Persona[] = [
         description: 'Helps you plan long-term career moves with precision',
         type: 'Strategic',
         icon: 'female',
+        avatar: require('@/assets/avatars/susan.png'),
     },
 ];
 

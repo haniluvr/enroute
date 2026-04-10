@@ -7,27 +7,36 @@ import {
     SafeAreaView,
     Dimensions,
     ImageBackground,
+    Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
 import { ChevronLeft, Lightbulb, Calendar, Download, FileText, Video, Wrench, Star, ChevronRight } from 'lucide-react-native';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import { careerDetailsMap } from '@/data/pathMockData';
 import { pathIconMap } from '@/components/path/pathIconMap';
-import { RoadmapCanvas } from '@/components/path/RoadmapCanvas';
+import { RoadmapModuleList } from '@/components/path/RoadmapModuleList';
 import { NodeDetailsSheet } from '@/components/path/NodeDetailsSheet';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import type { CareerDetails, ResourceItem } from '@/types/path';
 import { parsePathMeta, parseModuleTitle, formatPathTitle } from '@/utils/pathUtils';
+import { useAuth } from '@/hooks/useAuth';
+
 
 export default function CareerDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
+    const { user } = useAuth();
     const router = useRouter();
+
     const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
     const [career, setCareer] = useState<CareerDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedNode, setSelectedNode] = useState<any>(null);
+    const [completedNodes, setCompletedNodes] = useState<string[]>([]);
+    const [isUpdatingCompletion, setIsUpdatingCompletion] = useState(false);
+
 
     useEffect(() => {
         if (id) fetchCareerData();
@@ -49,17 +58,71 @@ export default function CareerDetailsScreen() {
             const { data: modulesData, error: modulesError } = await supabase
                 .from('learning_modules')
                 .select('*')
-                .eq('path_id', id);
+                .eq('path_id', id)
+                .order('order_index', { ascending: true });
 
             if (modulesError) throw modulesError;
 
-            // 3. Parse Overview for stats
-            const overview = pathData.overview || '';
-            const salaryMatch = overview.match(/Average Market Salary: (.*)/);
-            const demandMatch = overview.match(/Market Demand: (.*)/);
+            // 3. Fetch user completions
+            if (user && user.id !== 'pending') {
+                const { data: completionsData } = await supabase
+                    .from('user_module_completions')
+                    .select('module_id')
+                    .eq('user_id', user.id);
+                
+                const completedIds = completionsData?.map(c => c.module_id) || [];
+                setCompletedNodes(completedIds);
+            }
 
+            // 4. Transform modules into a hierarchical structure for the RoadmapModuleList
             const allModules = modulesData || [];
             
+            // Separate root modules and children
+            const rootModules = allModules.filter(m => !m.parent_id);
+            const childModules = allModules.filter(m => m.parent_id);
+
+            // Create a hierarchy: each root is a "Module/Phase", and its children are "Steps/Topics"
+            let structuredRoadmap: { nodes: any[], edges: any[] } = { nodes: [], edges: [] };
+
+            if (rootModules.length > 0) {
+                // If we have hierarchy in the DB
+                const treeNodes = allModules.map(m => ({
+                    id: m.id,
+                    type: m.parent_id ? 'leaf' : 'section',
+                    parentId: m.parent_id,
+                    data: { label: m.title }
+                }));
+                structuredRoadmap = { nodes: treeNodes, edges: [] };
+            } else {
+                // Fallback: If everything is flat (legacy), wrap them in phases
+                const itemsPerPhase = 4;
+                const legacyNodes: any[] = [];
+                for (let i = 0; i < allModules.length; i++) {
+                    const isPhaseHeader = i % itemsPerPhase === 0;
+                    if (isPhaseHeader) {
+                        const phaseId = `phase-${i}`;
+                        legacyNodes.push({
+                            id: phaseId,
+                            type: 'section',
+                            data: { label: `Phase ${Math.floor(i / itemsPerPhase) + 1}` }
+                        });
+                    }
+                    legacyNodes.push({
+                        id: allModules[i].id,
+                        parentId: `phase-${i - (i % itemsPerPhase)}`,
+                        type: 'leaf',
+                        data: { label: allModules[i].title }
+                    });
+                }
+                structuredRoadmap = { nodes: legacyNodes, edges: [] };
+            }
+
+            // 5. Parse Overview for stats
+            const overviewText = pathData.overview || '';
+            const salaryMatch = overviewText.match(/Average Market Salary: (.*)/);
+            const demandMatch = overviewText.match(/Market Demand: (.*)/);
+            
+            // 6. Build Resource lists
             const videos: ResourceItem[] = allModules
                 .filter((m: any) => m.content_type === 'video')
                 .map((m: any) => ({
@@ -91,8 +154,8 @@ export default function CareerDetailsScreen() {
             const mappedCareer: CareerDetails = {
                 id: pathData.id,
                 title: pathData.title,
-                description: overview.split('\n')[0],
-                icon: 'Palette', // Placeholder icon
+                description: overviewText.split('\n')[0],
+                icon: 'Palette', 
                 lastUpdated: new Date(pathData.created_at).toLocaleDateString(),
                 learnItems: allModules.map((m: any) => m.title),
                 jobDemand: demandMatch ? demandMatch[1].trim() : 'High',
@@ -102,7 +165,8 @@ export default function CareerDetailsScreen() {
                 videos: videos,
                 articles: articles,
                 reviews: [],
-                overview: overview
+                overview: overviewText,
+                structuredRoadmap: structuredRoadmap
             };
 
             setCareer(mappedCareer);
@@ -150,19 +214,59 @@ export default function CareerDetailsScreen() {
     const titlePrefix = meta.type === 'skill' ? 'Learning' : 'Becoming a';
     const IconComponent = pathIconMap[meta.icon] ?? pathIconMap.Palette;
 
-    let roadmapData = { nodes: [], edges: [] };
-    const roadmapMatch = career.overview?.match(/\[ROADMAP\]([\s\S]*?)\[\/ROADMAP\]/);
-    if (roadmapMatch) {
-        try {
-            roadmapData = JSON.parse(roadmapMatch[1]);
-        } catch (e) {
-            console.error('Failed to parse roadmap data');
+    let roadmapData = (career as any).structuredRoadmap || { nodes: [], edges: [] };
+    
+    // Fallback to legacy overview parse if structured fails
+    if (roadmapData.nodes.length === 0) {
+        const roadmapMatch = career.overview?.match(/\[ROADMAP\]([\s\S]*?)\[\/ROADMAP\]/);
+        if (roadmapMatch) {
+            try {
+                roadmapData = JSON.parse(roadmapMatch[1]);
+            } catch (e) {
+                console.error('Failed to parse roadmap data');
+            }
         }
     }
 
     const handleNodePress = (node: any) => {
         setSelectedNode(node);
     };
+
+    const handleToggleComplete = async (nodeId: string) => {
+        if (!user || isUpdatingCompletion) return;
+        setIsUpdatingCompletion(true);
+
+        const isCurrentlyCompleted = completedNodes.includes(nodeId);
+        
+        try {
+            if (isCurrentlyCompleted) {
+                // Remove completion
+                const { error } = await supabase
+                    .from('user_module_completions')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('module_id', nodeId);
+                if (error) throw error;
+                setCompletedNodes(prev => prev.filter(id => id !== nodeId));
+            } else {
+                // Add completion
+                const { error } = await supabase
+                    .from('user_module_completions')
+                    .insert({
+                        user_id: user.id,
+                        module_id: nodeId
+                    });
+                if (error) throw error;
+                setCompletedNodes(prev => [...prev, nodeId]);
+            }
+        } catch (err) {
+            console.error('Error toggling completion:', err);
+            Alert.alert('Error', 'Failed to update progress. Please try again.');
+        } finally {
+            setIsUpdatingCompletion(false);
+        }
+    };
+
 
     return (
         <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
@@ -201,12 +305,16 @@ export default function CareerDetailsScreen() {
                                 </Text>
                             </View>
                         </View>
-                        <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg`}>
-                            Interactive roadmap:
+                        <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg mb-2`}>
+                            Learning modules:
                         </Text>
                         
                         {roadmapData.nodes.length > 0 ? (
-                            <RoadmapCanvas data={roadmapData} onNodePress={handleNodePress} />
+                            <RoadmapModuleList 
+                                data={roadmapData} 
+                                onNodePress={handleNodePress} 
+                                completedNodes={completedNodes}
+                            />
                         ) : (
                             <View style={tw`mb-4 mt-2 px-2 py-8 items-center bg-black/10 rounded-2xl`}>
                                 <Text style={tw`text-white/50 font-[InterTight]`}>No graph data available for this path.</Text>
@@ -453,6 +561,14 @@ export default function CareerDetailsScreen() {
                 visible={!!selectedNode} 
                 node={selectedNode} 
                 onClose={() => setSelectedNode(null)} 
+                roadmapTitle={career.title}
+                resources={{
+                    videos: career.videos,
+                    pdfs: career.pdfs,
+                    articles: career.articles
+                }}
+                isCompleted={selectedNode ? completedNodes.includes(selectedNode.id) : false}
+                onToggleComplete={handleToggleComplete}
             />
         </GlassBackground>
     );

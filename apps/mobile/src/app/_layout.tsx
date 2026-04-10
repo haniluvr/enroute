@@ -37,15 +37,15 @@ function InitialLayout() {
     useEffect(() => {
         if (isLoading || !fontsLoaded) return;
 
-        const inAuthGroup = segments[0] === '(auth)';
         const inOnboarding = !segments[0] || segments[0] === 'onboarding' || segments[0] === 'index' || segments[0] === 'auth-selection';
         const isProtectedHeader = segments[0] === '(tabs)' || segments[0] === 'settings' || segments[0] === 'career-aptitude-test';
 
         if (!user && isProtectedHeader) {
             // If not logged in and trying to access protected routes, redirect to auth-selection
             router.replace('/auth-selection');
-        } else if (user && (inAuthGroup || inOnboarding)) {
-            // If logged in and on auth/onboarding pages, redirect to the app home
+        } else if (user && inOnboarding) {
+            // If logged in and on onboarding/auth-selection, redirect to the app home
+            // Note: we don't auto-redirect here if in (auth) to allow success modals to display.
             router.replace('/(tabs)/home');
         }
     }, [user, isLoading, segments, fontsLoaded]);

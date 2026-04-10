@@ -14,7 +14,7 @@ import { GlassBackground } from '@/components/GlassBackground';
 import { GlassCard } from '@/components/GlassCard';
 import { careerDetailsMap } from '@/data/pathMockData';
 import { pathIconMap } from '@/components/path/pathIconMap';
-import { RoadmapCanvas } from '@/components/path/RoadmapCanvas';
+import { RoadmapModuleList } from '@/components/path/RoadmapModuleList';
 import { NodeDetailsSheet } from '@/components/path/NodeDetailsSheet';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
@@ -26,6 +26,7 @@ export default function RoadmapDetailsScreen() {
     const router = useRouter();
     const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
     const [selectedNode, setSelectedNode] = useState<any>(null);
+    const [completedNodes, setCompletedNodes] = useState<string[]>([]);
 
     const careerMock = id ? careerDetailsMap[id as keyof typeof careerDetailsMap] : null;
 
@@ -142,6 +143,14 @@ export default function RoadmapDetailsScreen() {
         fetchFullStepData();
     }, [id, careerMock]);
 
+    const handleToggleComplete = (nodeId: string) => {
+        setCompletedNodes(prev => 
+            prev.includes(nodeId) 
+                ? prev.filter(id => id !== nodeId) 
+                : [...prev, nodeId]
+        );
+    };
+
     const displayData = careerMock || dbStep;
 
     if (isLoading) {
@@ -180,10 +189,14 @@ export default function RoadmapDetailsScreen() {
                             </View>
                         </View>
                         
-                        <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg mb-2`}>Interactive roadmap:</Text>
+                        <Text style={tw`text-gray-400 font-[InterTight-SemiBold] text-lg mb-2`}>Learning modules:</Text>
                         
                         {displayData.roadmapGraph?.nodes?.length > 0 ? (
-                            <RoadmapCanvas data={displayData.roadmapGraph} onNodePress={setSelectedNode} />
+                            <RoadmapModuleList 
+                                data={displayData.roadmapGraph} 
+                                onNodePress={setSelectedNode} 
+                                completedNodes={completedNodes}
+                            />
                         ) : (
                             <View style={tw`mb-4 mt-2 px-2 py-8 items-center bg-black/10 rounded-2xl`}>
                                 <Text style={tw`text-white/30 font-[InterTight]`}>Generating visual graph data...</Text>
@@ -290,7 +303,18 @@ export default function RoadmapDetailsScreen() {
                 </View>
             </ScrollView>
 
-            <NodeDetailsSheet visible={!!selectedNode} node={selectedNode} onClose={() => setSelectedNode(null)} />
+            <NodeDetailsSheet 
+                visible={!!selectedNode} 
+                node={selectedNode} 
+                onClose={() => setSelectedNode(null)} 
+                resources={{
+                    videos: displayData.videos || [],
+                    pdfs: displayData.pdfs || [],
+                    articles: displayData.articles || []
+                }}
+                isCompleted={selectedNode ? completedNodes.includes(selectedNode.id) : false}
+                onToggleComplete={handleToggleComplete}
+            />
         </GlassBackground>
     );
 }

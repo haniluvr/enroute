@@ -74,10 +74,15 @@ export const aiService = {
     /**
      * Chat/Coach response generation
      */
-    async generateCoachResponse(persona: string, history: { role: 'user' | 'assistant' | 'system', content: string }[]) {
+    async generateCoachResponse(persona: string, history: { role: 'user' | 'assistant' | 'system', content: string }[], isCall: boolean = false) {
         try {
-            const systemPrompt = `You are ${persona}, a career coach for the Enroute app. 
+            let systemPrompt = `You are ${persona}, a career coach for the Enroute app. 
             Be encouraging, professional, and practical. Use your expertise to guide the user towards their career goals.`;
+            
+            if (isCall) {
+                systemPrompt += `\n\nCRITICAL: You are in a real-time voice call. Keep your responses extremely brief (1-2 sentences maximum). 
+                Avoid long lists or deep explanations. Be punchy and conversational.`;
+            }
             
             console.log(`Sending to HF Llama 3 - Persona: ${persona}`);
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
@@ -423,16 +428,19 @@ export const aiService = {
     /**
      * Generate TTS audio via Hugging Face Kokoro-82M (using Replicate provider)
      */
-    async generateTTS(text: string) {
+    async generateTTS(text: string, voice: string = 'af_sky') {
         try {
-            console.log('--- TTS START (Kokoro via Replicate) ---');
+            console.log(`--- TTS START (Kokoro via Replicate) --- Voice: ${voice}`);
             
             // Using the new Inference Providers strategy
             const response = await hf.textToSpeech({
                 model: 'hexgrad/Kokoro-82M',
                 inputs: text,
-                provider: 'replicate'
-            });
+                provider: 'replicate',
+                parameters: {
+                    voice
+                }
+            } as any); // Cast as any because the HfInference TS type might not include provider-specific parameters yet
 
             // hf.textToSpeech returns a Blob
             const arrayBuffer = await response.arrayBuffer();
@@ -444,6 +452,47 @@ export const aiService = {
         } catch (error: any) {
             console.error('Kokoro TTS Error:', error.message);
             throw new Error(`TTS failed: ${error.message}`);
+        }
+    },
+    /**
+     * Generate session summary: Key Insights and Key Quotes
+     */
+    async generateSummary(history: { role: string, content: string }[]) {
+        try {
+            const historyText = history.map((h: any) => `${h.role}: ${h.content}`).join('\n');
+            const prompt = `Summarize the following career coaching session into a brief overview paragraph, precisely 3 key insights, 3 key quotes, and 3 key action points (notes).
+            
+            FORMAT:
+            {
+              "overview": "A brief 2-3 sentence summary of the call.",
+              "insights": ["Insight 1", "Insight 2", "Insight 3"],
+              "quotes": ["Quote 1", "Quote 2", "Quote 3"],
+              "notes": ["Action 1", "Action 2", "Action 3"]
+            }
+            
+            Keep the overview encouraging, insights professional, quotes literal, and notes actionable. Output ONLY the JSON object.
+            
+            SESSION TEXT:
+            ${historyText}`;
+
+            const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
+                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                messages: [
+                    { role: 'system', content: 'You are a career development specialist. Extract key learning points and notable quotes from coaching sessions. Output ONLY valid JSON.' },
+                    { role: 'user', content: prompt }
+                ],
+                max_tokens: 800,
+                temperature: 0.3
+            }, {
+                headers: { 'Authorization': `Bearer ${HF_API_KEY}` }
+            });
+
+            const content = response.data.choices[0].message.content;
+            const match = content?.match(/\{.*\}/s);
+            return match ? JSON.parse(match[0]) : { overview: "", insights: [], quotes: [], notes: [] };
+        } catch (error: any) {
+            console.error('Summary Generation Error:', error.message);
+            return { overview: "", insights: [], quotes: [], notes: [] };
         }
     }
 };

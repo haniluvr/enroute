@@ -13,6 +13,7 @@ import {
     Dimensions,
     KeyboardAvoidingView,
     Platform,
+    Image,
     Keyboard,
 } from 'react-native';
 import { useState, useRef, useEffect } from 'react';
@@ -23,6 +24,10 @@ import { GlassBackground } from '@/components/GlassBackground';
 import { BlurView } from 'expo-blur';
 import LottieView from 'lottie-react-native';
 import { useAuth } from '@/hooks/useAuth';
+import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
+import { AI_API } from '@/config/backend';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,9 +54,9 @@ const CURRENT_LEVELS = [
 ];
 
 const PERSONAS = [
-    { id: 'male', label: 'Male', icon: '🧑', description: 'Deep & clear' },
-    { id: 'female', label: 'Female', icon: '👩', description: 'Warm & expressive' },
-    { id: 'neutral', label: 'Dahlia', icon: '🌸', description: 'Calm & balanced' },
+    { id: 'alex', label: 'Alex', icon: require('@/assets/avatars/alex.png'), description: 'Professional & Clear' },
+    { id: 'susan', label: 'Susan', icon: require('@/assets/avatars/susan.png'), description: 'Warm & Encouraging' },
+    { id: 'dahlia', label: 'Dahlia', icon: require('@/assets/avatars/dahlia.png'), description: 'Calm & Strategic' },
 ];
 
 const TOTAL_STEPS = 3;
@@ -166,7 +171,13 @@ function PersonaCard({
                 extraStyle,
             ]}
         >
-            <Text style={{ fontSize: 36, marginBottom: 10 }}>{persona.icon}</Text>
+            <View style={tw`w-20 h-20 rounded-full overflow-hidden mb-3 border-2 ${isSelected ? 'border-[#6d3659]' : 'border-white/10'}`}>
+                <Image 
+                    source={persona.icon as any} 
+                    style={tw`w-full h-full`}
+                    resizeMode="cover"
+                />
+            </View>
             <Text style={tw`text-white font-[InterTight] font-bold text-base text-center mb-1`}>
                 {persona.label}
             </Text>
@@ -234,8 +245,15 @@ export default function SignUpScreen() {
     const [careerError, setCareerError] = useState('');
     const [levelError, setLevelError] = useState('');
 
-    const { signIn, syncProfile } = useAuth();
+    const { signIn, syncProfile, user } = useAuth();
     const [showErrorToast, setShowErrorToast] = useState(false);
+
+    // Only redirect if user is already logged in AND we're not showing the success modal
+    useEffect(() => {
+        if (user && !showSuccessModal && !isLoading) {
+            router.replace('/(tabs)/home');
+        }
+    }, [user, showSuccessModal, isLoading]);
 
     useEffect(() => {
         if (showSuccessModal) {
@@ -250,6 +268,84 @@ export default function SignUpScreen() {
             ]).start();
         }
     }, [showSuccessModal]);
+
+    // TTS Preview logic
+    const currentSoundRef = useRef<Audio.Sound | null>(null);
+    const isFetchingTTSRef = useRef<boolean>(false);
+    const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+
+    const handleVoicePreview = async (personaId: string) => {
+        // Immediately stop current audio
+        if (currentSoundRef.current) {
+            try {
+                await currentSoundRef.current.stopAsync();
+                await currentSoundRef.current.unloadAsync();
+            } catch (e) {
+                console.log('Error stopping audio:', e);
+            }
+            currentSoundRef.current = null;
+            setIsSpeaking(false);
+        }
+
+        if (isFetchingTTSRef.current) return;
+
+        let voice = 'af_belle';
+        let text = "Hi! Welcome to Enroute! I'm Dahlia!";
+
+        if (personaId === 'alex') {
+            voice = 'am_michael';
+            text = "Greetings. Welcome to Enroute. I'm Alex.";
+        } else if (personaId === 'susan') {
+            voice = 'af_sarah';
+            text = "Hello! Welcome to Enroute. I'm Susan.";
+        }
+
+        try {
+            isFetchingTTSRef.current = true;
+            setIsSpeaking(true);
+
+            const response = await fetch(AI_API.TTS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, voice })
+            });
+
+            if (!response.ok) throw new Error('TTS failed');
+            const data = await response.json();
+            if (!data.audioUri) throw new Error('No audio returned');
+
+            const base64Data = data.audioUri.replace(/^data:audio\/mpeg;base64,/, '');
+            const tempPath = `${FileSystem.cacheDirectory}preview_${personaId}_${Date.now()}.mp3`;
+            await FileSystem.writeAsStringAsync(tempPath, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+
+            const { sound } = await Audio.Sound.createAsync({ uri: tempPath }, { shouldPlay: true });
+            currentSoundRef.current = sound;
+
+            sound.setOnPlaybackStatusUpdate(async (status: any) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    setIsSpeaking(false);
+                    await sound.unloadAsync();
+                    currentSoundRef.current = null;
+                    await FileSystem.deleteAsync(tempPath, { idempotent: true });
+                }
+            });
+        } catch (error) {
+            console.error('Preview TTS Error:', error);
+            setIsSpeaking(false);
+            // Fallback to basic expo-speech if backend fails
+            Speech.speak(text, { onDone: () => setIsSpeaking(false) });
+        } finally {
+            isFetchingTTSRef.current = false;
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (currentSoundRef.current) {
+                currentSoundRef.current.unloadAsync();
+            }
+        };
+    }, []);
 
     const validateStep1 = () => {
         let isValid = true;
@@ -362,7 +458,7 @@ export default function SignUpScreen() {
     const handlePersonaSelect = (id: string) => {
         setSelectedPersona(id);
         if (personaError) setPersonaError('');
-        // TODO: Play voice preview for selected persona
+        handleVoicePreview(id);
     };
 
     const [signedUpUser, setSignedUpUser] = useState<any>(null);

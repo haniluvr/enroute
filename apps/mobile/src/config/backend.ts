@@ -14,4 +14,5 @@ export const AI_API = {
     APPLY: `${BACKEND_URL}/api/jobs/apply`,
     SEARCH_JOBS: `${BACKEND_URL}/api/jobs/search`,
     SYNC_JOB: `${BACKEND_URL}/api/jobs/sync`,
+    SUMMARIZE: `${BACKEND_URL}/api/ai/summarize`,
 };

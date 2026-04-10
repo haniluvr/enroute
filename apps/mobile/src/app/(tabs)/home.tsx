@@ -28,7 +28,7 @@ export default function HomeScreen() {
                 .from('library_saves')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(4);
+                .limit(5);
             
             if (userId) {
                 query.eq('user_id', userId);
@@ -213,10 +213,12 @@ export default function HomeScreen() {
                                         {activity.detail}
                                     </Text>
 
-                                    {/* Progress Bar */}
-                                    <View style={tw`w-full h-1 bg-white/10 rounded-full overflow-hidden`}>
-                                        <View style={[tw`h-full bg-white rounded-full`, { width: `${activity.progress * 100}%` }]} />
-                                    </View>
+                                    {/* Progress Bar - Only for Roadmap, Path, and Module */}
+                                    {(activity.type === 'Roadmap' || activity.type === 'Path' || activity.type === 'Module') && (
+                                        <View style={tw`w-full h-1 bg-white/10 rounded-full overflow-hidden`}>
+                                            <View style={[tw`h-full bg-white rounded-full`, { width: `${activity.progress * 100}%` }]} />
+                                        </View>
+                                    )}
                                 </GlassCard>
                             </TouchableOpacity>
                         ))}

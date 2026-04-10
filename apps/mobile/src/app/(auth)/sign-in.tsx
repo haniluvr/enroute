@@ -32,7 +32,14 @@ export default function SignInScreen() {
     const backdropOpacity = useRef(new Animated.Value(0)).current;
     const cardTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
-    const { signIn } = useAuth();
+    const { signIn, user } = useAuth();
+
+    // Only redirect if user is already logged in AND we're not showing the success modal
+    useEffect(() => {
+        if (user && !showSuccessModal && !isLoading) {
+            router.replace('/(tabs)/home');
+        }
+    }, [user, showSuccessModal, isLoading]);
 
     useEffect(() => {
         if (showSuccessModal) {
