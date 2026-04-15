@@ -6,6 +6,8 @@ import { createClient } from '@supabase/supabase-js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import aiRoutes from './routes/ai';
+import adminRoutes from './routes/admin';
 
 // Load environment variables
 dotenv.config();
@@ -399,6 +401,10 @@ app.use((req, res) => {
     console.log(`404: ${req.method} ${req.url}`);
     res.status(404).json({ error: 'Endpoint not found', path: req.url });
 });
+
+// App Routers
+app.use('/api/ai', aiRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.listen(PORT, () => {
     console.log(`Backend server running on port ${PORT}`);

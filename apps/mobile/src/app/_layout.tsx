@@ -12,6 +12,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Platform, View, Text } from 'react-native';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -29,6 +30,9 @@ function InitialLayout() {
     });
 
     useEffect(() => {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.location.href = 'http://localhost:5173/';
+        }
         if (fontsLoaded || fontError) {
             SplashScreen.hideAsync();
         }
@@ -56,6 +60,14 @@ function InitialLayout() {
 
     if (!fontsLoaded && !fontError) {
         return null; // Wait for fonts to load
+    }
+
+    if (Platform.OS === 'web') {
+        return (
+            <View style={{ flex: 1, backgroundColor: '#0a0f1c', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: 'white' }}>Redirecting to Admin Web Portal...</Text>
+            </View>
+        );
     }
 
     return (
