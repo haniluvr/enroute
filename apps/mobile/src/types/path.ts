@@ -40,4 +40,8 @@ export interface CareerDetails extends PathCard {
     videos: ResourceItem[];
     articles: ResourceItem[];
     reviews: Review[];
+    structuredRoadmap?: {
+        nodes: any[];
+        edges: any[];
+    };
 }

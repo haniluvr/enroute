@@ -214,7 +214,7 @@ export default function CareerDetailsScreen() {
     const titlePrefix = meta.type === 'skill' ? 'Learning' : 'Becoming a';
     const IconComponent = pathIconMap[meta.icon] ?? pathIconMap.Palette;
 
-    let roadmapData = (career as any).structuredRoadmap || { nodes: [], edges: [] };
+    let roadmapData = career.structuredRoadmap || { nodes: [], edges: [] };
     
     // Fallback to legacy overview parse if structured fails
     if (roadmapData.nodes.length === 0) {
