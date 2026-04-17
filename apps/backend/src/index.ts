@@ -47,11 +47,13 @@ const logFile = fs.createWriteStream('backend.log', { flags: 'a' });
 const originalLog = console.log;
 const originalError = console.error;
 console.log = (...args) => {
-    logFile.write(`[LOG ${new Date().toISOString()}] ${args.join(' ')}\n`);
+    const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+    logFile.write(`[LOG ${new Date().toISOString()}] ${message}\n`);
     originalLog(...args);
 };
 console.error = (...args) => {
-    logFile.write(`[ERR ${new Date().toISOString()}] ${args.join(' ')}\n`);
+    const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+    logFile.write(`[ERR ${new Date().toISOString()}] ${message}\n`);
     originalError(...args);
 };
 
@@ -65,7 +67,7 @@ app.get('/api/health', async (req, res) => {
     try {
         const testResp = await axios.post('https://router.huggingface.co/v1/chat/completions', 
             { 
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [{ role: "user", content: "hi" }],
                 max_tokens: 10
             }, 
@@ -233,6 +235,40 @@ app.post('/api/ai/parse-cv', async (req, res) => {
     } catch (error: any) {
         console.error('CV Parse Endpoint Error:', error);
         res.status(500).json({ error: 'Failed to parse CV', details: error.message });
+    }
+});
+
+/**
+ * Refine Resume Text Endpoint
+ */
+app.post('/api/ai/refine-resume', async (req, res) => {
+    try {
+        const { text, context } = req.body;
+        if (!text) return res.status(400).json({ error: 'Text is required' });
+        
+        console.log(`Refining resume text...`);
+        const refined = await aiService.refineResumeText(text, context);
+        res.json({ refined });
+    } catch (error) {
+        console.error('Refine Resume Error:', error);
+        res.status(500).json({ error: 'Failed to refine text' });
+    }
+});
+
+/**
+ * Resume Magic Fill Endpoint
+ */
+app.post('/api/ai/resume-magic-fill', async (req, res) => {
+    try {
+        const { userData } = req.body;
+        if (!userData) return res.status(400).json({ error: 'User data is required' });
+        
+        console.log(`Generating Magic Fill for resume...`);
+        const fillData = await aiService.getResumeMagicFill(userData);
+        res.json(fillData);
+    } catch (error) {
+        console.error('Magic Fill Error:', error);
+        res.status(500).json({ error: 'Failed to generate magic fill' });
     }
 });
 

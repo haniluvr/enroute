@@ -204,7 +204,16 @@ export default function ExploreScreen() {
                     color: '#fbbf24'
                 }
             ];
-            setJobs(mockJobs);
+            // Filter mock jobs based on swipes
+            const { data: swipes } = await supabase
+                .from('job_swipes')
+                .select('jobs(external_id)')
+                .eq('user_id', user.id);
+            
+            const swipedExternalIds = new Set(swipes?.map(s => (s.jobs as any)?.external_id).filter(Boolean) || []);
+            const filteredMockJobs = mockJobs.filter(j => !swipedExternalIds.has(j.id));
+
+            setJobs(filteredMockJobs);
         } finally {
             setIsLoading(false);
         }
@@ -219,6 +228,9 @@ export default function ExploreScreen() {
     const handleSwipe = async (isInterested: boolean) => {
         const swipedJob = jobs[0];
         if (!swipedJob || !user) return;
+
+        // Optimistically remove the job from the stack
+        setJobs((prev) => prev.slice(1));
 
         try {
             // 1. Sync job to local DB first
@@ -242,11 +254,18 @@ export default function ExploreScreen() {
                 ai_match_percentage: swipedJob.matchPercentage
             });
 
-            if (error) throw error;
-
-            setJobs((prev) => prev.slice(1));
+            if (error) {
+                // Ignore duplicate swipes (already recorded)
+                if (error.code === '23505') {
+                    console.log('[Swipe] Already recorded, ignoring duplicate.');
+                    return;
+                }
+                throw error;
+            }
         } catch (err) {
             console.error('Swipe Error:', err);
+            // Optional: You could add logic here to put the job back in the stack if it was a critical failure,
+            // but for swipes, it's usually better to just keep going.
         }
     };
 

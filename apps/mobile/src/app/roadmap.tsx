@@ -216,8 +216,13 @@ export default function RoadmapScreen() {
                                 <Text style={tw`text-white mt-8 mb-4`}>Select core skills</Text>
                                 <View style={tw`flex-row flex-wrap gap-2`}>
                                     {COMMON_SKILLS.map(skill => (
-                                        <TouchableOpacity key={skill} onPress={() => toggleSkill(skill)} style={tw`bg-white/5 border border-white/10 px-4 py-2 rounded-xl ${selectedSkills.includes(skill) ? 'border-accent-pink' : ''}`}>
-                                            <Text style={tw`text-white`}>{skill}</Text>
+                                        <TouchableOpacity 
+                                            key={skill} 
+                                            onPress={() => toggleSkill(skill)}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            style={tw`bg-white/5 border border-white/10 px-5 py-3 rounded-2xl ${selectedSkills.includes(skill) ? 'border-accent-pink bg-accent-pink/10' : ''}`}
+                                        >
+                                            <Text style={tw`text-white font-[InterTight-Medium]`}>{skill}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>

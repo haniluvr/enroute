@@ -289,7 +289,7 @@ export const externalDataService = {
             Provide ONLY the estimated salary range (e.g. "₱45,000 - ₱65,000" or "$3,500 - $5,000"). No explanation. Output ONLY the range.`;
 
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are a career salary expert. Output ONLY the estimated salary range in local currency.' },
                     { role: 'user', content: prompt }
@@ -336,7 +336,7 @@ export const externalDataService = {
             Output ONLY a JSON array of objects with "id", "summary", and "skills". No explanation.`;
 
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are a professional HR analyst. Summarize jobs concisely for a mobile app.' },
                     { role: 'user', content: prompt }
@@ -397,7 +397,7 @@ export const externalDataService = {
             console.log(`[AI] Extracting skills for ${jobs.length} jobs using index mapping.`);
 
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are an HR technology assistant. Extract concise skills in JSON.' },
                     { role: 'user', content: prompt }

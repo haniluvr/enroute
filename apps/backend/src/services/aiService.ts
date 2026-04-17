@@ -86,7 +86,7 @@ export const aiService = {
             
             console.log(`Sending to HF Llama 3 - Persona: ${persona}`);
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: systemPrompt },
                     ...history
@@ -120,7 +120,7 @@ export const aiService = {
             Return as a JSON object with keys "technical" and "soft", each containing an array of strings. Output ONLY the JSON object:\n\n${text}`;
             
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are a professional recruiting assistant. Categorize skills strictly. Technical skills are specific hard skills/tools. Soft skills are interpersonal or cognitive abilities. Output ONLY a valid JSON object.' },
                     { role: 'user', content: prompt }
@@ -268,7 +268,7 @@ export const aiService = {
             4. Clean, direct skill names only.`;
 
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are an expert career strategist. Output ONLY a valid JSON array of comprehensive missing skills.' },
                     { role: 'user', content: prompt }
@@ -303,7 +303,7 @@ export const aiService = {
             const prompt = `Analyze these career aptitude test answers from a user:\n\n${answersText}\n\nBased on these answers, write a single concise and encouraging paragraph (max 2 sentences) suggesting their perfect career match. Focus primarily on either Software Development (Frontend/Backend/FullStack), Design (UI/UX), Engineering (DevOps, Data, AI), or Architecture. Output ONLY the paragraph, nothing else. Start with "Based on your answers, "`;
 
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are an expert career profiler. Output ONLY the requested paragraph summary. Be highly encouraging and specific.' },
                     { role: 'user', content: prompt }
@@ -377,7 +377,7 @@ export const aiService = {
 
             console.log(`[AI] Generating roadmap for: "${goal}"`);
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are an elite career development architect. You return ONLY the JSON object. Do not explain your logic.' },
                     { role: 'user', content: prompt }
@@ -426,32 +426,67 @@ export const aiService = {
     },
 
     /**
-     * Generate TTS audio via Hugging Face Kokoro-82M (using Replicate provider)
+     * Generate TTS audio via ElevenLabs
      */
-    async generateTTS(text: string, voice: string = 'af_sky') {
+    async generateTTS(text: string, voice: string = 'pNInz6obpg8ndPBZshv1') { // Default to a nice voice
         try {
-            console.log(`--- TTS START (Kokoro via Replicate) --- Voice: ${voice}`);
+            // Map legacy Kokoro voice names to ElevenLabs voice IDs if needed
+            let elVoice = voice;
+            const voiceMap: Record<string, string> = {
+                'af_sky': 'pNInz6obpg8ndPBZshv1',
+                'af_sarah': 'EXAVITQu4vr4xnSDxMaL',
+                'af_bella': 'EXAVITQu4vr4xnSDxMaL',
+                'am_michael': 'ErXw9S8t96xP9KToH9qF',
+                'default': 'pNInz6obpg8ndPBZshv1'
+            };
             
-            // Using the new Inference Providers strategy
-            const response = await hf.textToSpeech({
-                model: 'hexgrad/Kokoro-82M',
-                inputs: text,
-                provider: 'replicate',
-                parameters: {
-                    voice
-                }
-            } as any); // Cast as any because the HfInference TS type might not include provider-specific parameters yet
+            if (voiceMap[voice]) {
+                elVoice = voiceMap[voice];
+            } else if (!voice || voice.length < 5) {
+                elVoice = 'pNInz6obpg8ndPBZshv1';
+            }
 
-            // hf.textToSpeech returns a Blob
-            const arrayBuffer = await response.arrayBuffer();
-            const audioBuffer = Buffer.from(arrayBuffer);
-            const base64Audio = audioBuffer.toString('base64');
-            console.log(`Kokoro TTS success, audio size: ${audioBuffer.length} bytes`);
+            console.log(`--- TTS START (ElevenLabs) --- Voice: ${voice} -> ${elVoice}`);
+            
+            const response = await axios.post(
+                `https://api.elevenlabs.io/v1/text-to-speech/${elVoice}`,
+                {
+                    text,
+                    model_id: "eleven_monolingual_v1",
+                    voice_settings: {
+                        stability: 0.5,
+                        similarity_boost: 0.5
+                    }
+                },
+                {
+                    headers: {
+                        'xi-api-key': process.env.ELEVEN_LABS_API_KEY,
+                        'Content-Type': 'application/json',
+                    },
+                    responseType: 'arraybuffer'
+                }
+            );
+
+            const base64Audio = Buffer.from(response.data).toString('base64');
+            console.log(`ElevenLabs TTS success, audio size: ${response.data.byteLength} bytes`);
             
             return `data:audio/mpeg;base64,${base64Audio}`;
         } catch (error: any) {
-            console.error('Kokoro TTS Error:', error.message);
-            throw new Error(`TTS failed: ${error.message}`);
+            console.error('ElevenLabs TTS Error:', error?.response?.data || error.message);
+            // Fallback to HF if ElevenLabs fails, but different model
+            try {
+                console.log('Falling back to HF for TTS...');
+                const response = await hf.textToSpeech({
+                    model: 'facebook/mms-tts-eng',
+                    inputs: text,
+                });
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = Buffer.from(arrayBuffer);
+                return `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
+            } catch (fallbackError: any) {
+                console.error('TTS Fallback Error:', fallbackError.message);
+                throw new Error(`TTS failed: ${error.message}`);
+            }
         }
     },
     /**
@@ -476,7 +511,7 @@ export const aiService = {
             ${historyText}`;
 
             const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
-                model: "meta-llama/Meta-Llama-3-8B-Instruct",
+                model: "meta-llama/Llama-3.1-8B-Instruct",
                 messages: [
                     { role: 'system', content: 'You are a career development specialist. Extract key learning points and notable quotes from coaching sessions. Output ONLY valid JSON.' },
                     { role: 'user', content: prompt }
@@ -493,6 +528,83 @@ export const aiService = {
         } catch (error: any) {
             console.error('Summary Generation Error:', error.message);
             return { overview: "", insights: [], quotes: [], notes: [] };
+        }
+    },
+
+    /**
+     * Refine Resume/CV text (Summary, Bullets, etc.)
+     */
+    async refineResumeText(text: string, context: string = "") {
+        try {
+            const prompt = `Refine the following professional text for a ${context || 'CV/Resume'}. 
+            Improve the wording to be more impactful, professional, and achievement-oriented. 
+            Do NOT change the underlying facts. 
+            Keep it concise.
+            
+            TEXT:
+            ${text}
+            
+            OUTPUT ONLY THE REFINED TEXT:`;
+
+            const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
+                model: "meta-llama/Llama-3.1-8B-Instruct",
+                messages: [
+                    { role: 'system', content: 'You are a professional resume editor. Output ONLY the refined text.' },
+                    { role: 'user', content: prompt }
+                ],
+                max_tokens: 500,
+                temperature: 0.4
+            }, {
+                headers: { 'Authorization': `Bearer ${HF_API_KEY}` }
+            });
+
+            return response.data.choices[0].message.content.trim();
+        } catch (error: any) {
+            console.error('Refine Text Error:', error.message);
+            return text;
+        }
+    },
+
+    /**
+     * Consolidate user data into a structured Magic Fill response
+     */
+    async getResumeMagicFill(userData: any) {
+        try {
+            const prompt = `Based on the following user profile and interaction data, consolidate it into a structured JSON for a Resume/CV. 
+            Only use data that is explicitly present.
+            
+            USER DATA:
+            ${JSON.stringify(userData, null, 2)}
+            
+            FORMAT:
+            {
+              "personal": { "fullName": "...", "email": "...", "phone": "...", "location": "..." },
+              "summary": "AI-generated professional summary based on profile.",
+              "skills": ["Skill 1", "Skill 2"],
+              "experience": [{ "title": "...", "company": "...", "dates": "...", "bullets": ["..."] }],
+              "education": [{ "degree": "...", "school": "...", "year": "..." }]
+            }
+            
+            Output ONLY valid JSON.`;
+
+            const response = await axios.post('https://router.huggingface.co/v1/chat/completions', {
+                model: "meta-llama/Llama-3.1-8B-Instruct",
+                messages: [
+                    { role: 'system', content: 'You are a career development assistant. Consolidate user data into a professional resume structure. Output ONLY valid JSON.' },
+                    { role: 'user', content: prompt }
+                ],
+                max_tokens: 1500,
+                temperature: 0.2
+            }, {
+                headers: { 'Authorization': `Bearer ${HF_API_KEY}` }
+            });
+
+            const content = response.data.choices[0].message.content;
+            const match = content?.match(/\{.*\}/s);
+            return match ? JSON.parse(match[0]) : {};
+        } catch (error: any) {
+            console.error('Magic Fill Error:', error.message);
+            return {};
         }
     }
 };

@@ -4,12 +4,81 @@ import { GlassCard } from '@/components/GlassCard';
 import { GlassBackground } from '@/components/GlassBackground';
 import { GlassButton } from '@/components/GlassButton';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { User, ChevronLeft } from 'lucide-react-native';
+import { useState, useRef } from 'react';
+import { User, ChevronLeft, Volume2, Activity } from 'lucide-react-native';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+import { AI_API } from '@/config/backend';
 
 export default function PersonaScreen() {
     const router = useRouter();
     const [selected, setSelected] = useState<'Male' | 'Female' | 'Neutral' | null>(null);
+    const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+    const soundRef = useRef<Audio.Sound | null>(null);
+
+    const playVoicePreview = async (personaType: 'Male' | 'Female' | 'Neutral') => {
+        try {
+            // Stop existing sound
+            if (soundRef.current) {
+                await soundRef.current.stopAsync();
+                await soundRef.current.unloadAsync();
+                soundRef.current = null;
+            }
+
+            setIsPlayingPreview(true);
+
+            // Select voice and text based on persona
+            let voice = 'af_bella';
+            let text = "Hi, I'm your neutral AI coach. I'm here to support your career journey.";
+            
+            if (personaType === 'Male') {
+                voice = 'am_michael';
+                text = "Hello, I'm Alex. I specialize in tech career growth and direct feedback.";
+            } else if (personaType === 'Female') {
+                voice = 'af_sarah';
+                text = "Greetings, I'm Susan. I'll help you plan your career moves with strategic precision.";
+            }
+
+            console.log(`[Persona] Fetching TTS for: ${voice}`);
+            const response = await fetch(AI_API.TTS, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, voice })
+            });
+
+            if (!response.ok) throw new Error('TTS request failed');
+
+            const data = await response.json();
+            if (!data.audioUri) throw new Error('No audio returned');
+
+            const base64Data = data.audioUri.replace(/^data:audio\/mpeg;base64,/, '');
+            const tempPath = `${FileSystem.cacheDirectory}persona_preview_${Date.now()}.mp3`;
+            await FileSystem.writeAsStringAsync(tempPath, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: tempPath }, 
+                { shouldPlay: true, playsInSilentModeIOS: true }
+            );
+            soundRef.current = sound;
+            
+            sound.setOnPlaybackStatusUpdate(async (status: any) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    setIsPlayingPreview(false);
+                    await sound.unloadAsync();
+                    soundRef.current = null;
+                    await FileSystem.deleteAsync(tempPath, { idempotent: true });
+                }
+            });
+        } catch (error) {
+            console.error('TTS Preview Error:', error);
+            setIsPlayingPreview(false);
+        }
+    };
+
+    const handleSelect = (type: 'Male' | 'Female' | 'Neutral') => {
+        setSelected(type);
+        playVoicePreview(type);
+    };
 
     const handleContinue = () => {
         if (!selected) return;
@@ -35,29 +104,41 @@ export default function PersonaScreen() {
                     </View>
 
                     <View style={tw`flex-row justify-between mb-6`}>
-                        <TouchableOpacity onPress={() => setSelected('Male')} activeOpacity={0.8} style={tw`flex-1 mr-2`}>
+                        <TouchableOpacity onPress={() => handleSelect('Male')} activeOpacity={0.8} style={tw`flex-1 mr-2`}>
                             <GlassCard style={tw`items-center justify-center p-6 border ${selected === 'Male' ? 'border-accent-violet' : 'border-white/10'}`}>
                                 <View style={tw`bg-white/10 p-4 rounded-full mb-4`}>
-                                    <User color="#fff" size={32} />
+                                    {selected === 'Male' && isPlayingPreview ? (
+                                        <Activity color="#fff" size={32} />
+                                    ) : (
+                                        <Volume2 color="#fff" size={32} />
+                                    )}
                                 </View>
                                 <Text style={tw`text-white font-[InterTight] font-medium`}>Male</Text>
                             </GlassCard>
                         </TouchableOpacity>
 
-                        <TouchableOpacity onPress={() => setSelected('Female')} activeOpacity={0.8} style={tw`flex-1 ml-2`}>
+                        <TouchableOpacity onPress={() => handleSelect('Female')} activeOpacity={0.8} style={tw`flex-1 ml-2`}>
                             <GlassCard style={tw`items-center justify-center p-6 border ${selected === 'Female' ? 'border-accent-pink' : 'border-white/10'}`}>
                                 <View style={tw`bg-white/10 p-4 rounded-full mb-4`}>
-                                    <User color="#fff" size={32} />
+                                    {selected === 'Female' && isPlayingPreview ? (
+                                        <Activity color="#fff" size={32} />
+                                    ) : (
+                                        <Volume2 color="#fff" size={32} />
+                                    )}
                                 </View>
                                 <Text style={tw`text-white font-[InterTight] font-medium`}>Female</Text>
                             </GlassCard>
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity onPress={() => setSelected('Neutral')} activeOpacity={0.8} style={tw`mb-10`}>
+                    <TouchableOpacity onPress={() => handleSelect('Neutral')} activeOpacity={0.8} style={tw`mb-10`}>
                         <GlassCard style={tw`items-center justify-center p-6 w-1/2 border ${selected === 'Neutral' ? 'border-accent-cyan' : 'border-white/10'}`}>
                             <View style={tw`bg-white/10 p-4 rounded-full mb-4`}>
-                                <User color="#fff" size={32} />
+                                {selected === 'Neutral' && isPlayingPreview ? (
+                                    <Activity color="#fff" size={32} />
+                                ) : (
+                                    <Volume2 color="#fff" size={32} />
+                                )}
                             </View>
                             <Text style={tw`text-white font-[InterTight] font-medium`}>Neutral</Text>
                         </GlassCard>

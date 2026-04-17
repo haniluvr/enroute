@@ -4,20 +4,27 @@ const tw = create({
     theme: {
         extend: {
             colors: {
-                background: '#111111', // Charcoal black
-                card: '#1F1F2E',
+                background: '#0A0A1A',
+                card: '#14142B',
                 accent: {
-                    teal: '#2b4e50',   // Deep teal
-                    purple: '#B900C2', // Vibrant purple
-                    grey: '#fafafa',   // Soft grey
-                    white: '#fcfcfc'   // Near white
+                    violet: '#5900ff', // Main Call-to-action
+                    pink: '#ff007f',   // Highlights/Metrics
+                    cyan: '#00e5ff',   // Informational
+                    emerald: '#00ff7f' // Success states
                 }
             },
             fontFamily: {
-                inter: 'InterTight-Regular',
+                'InterTight': 'InterTight-Regular',
+                'InterTight-Medium': 'InterTight-Medium',
+                'InterTight-SemiBold': 'InterTight-SemiBold',
+                'InterTight-Bold': 'InterTight-Bold',
+                'inter': 'InterTight-Regular',
                 'inter-medium': 'InterTight-Medium',
                 'inter-semibold': 'InterTight-SemiBold',
                 'inter-bold': 'InterTight-Bold',
+            },
+            spacing: {
+                '17': '4.25rem',
             }
         }
     }
