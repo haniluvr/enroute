@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Briefcase, Search, ExternalLink, RefreshCw, Send, Users } from 'lucide-react';
-import { MassBlastModal } from '../components/MassBlastModal';
+import { RecommendToUsersModal } from '../components/RecommendToUsersModal';
 import { ApplicantViewerModal } from '../components/ApplicantViewerModal';
 
 export const JobBoard = () => {
@@ -11,7 +11,7 @@ export const JobBoard = () => {
     const [error, setError] = useState<string | null>(null);
     const [cooldown, setCooldown] = useState(false);
     
-    const [blastJob, setBlastJob] = useState<any | null>(null);
+    const [recommendationJob, setRecommendationJob] = useState<any | null>(null);
     const [viewApplicantJob, setViewApplicantJob] = useState<any | null>(null);
 
     const searchJobs = async () => {
@@ -20,12 +20,17 @@ export const JobBoard = () => {
         setLoading(true);
         setError(null);
         
-        
         setCooldown(true);
         setTimeout(() => setCooldown(false), 5000);
 
-        const apiKey = '894300aaffmsha60b9e1d46aea4ep1b789fjsn93c65f0d9b4f';
+        const apiKey = import.meta.env.VITE_RAPIDAPI_KEY;
         const fullQuery = `${query} in ${region}`;
+
+        if (!apiKey) {
+            setError("JSearch API Key is missing in .env file (VITE_RAPIDAPI_KEY).");
+            setLoading(false);
+            return;
+        }
 
         try {
             const res = await fetch(`https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(fullQuery)}&page=1&num_pages=1`, {
@@ -35,7 +40,10 @@ export const JobBoard = () => {
                 }
             });
 
-            if (!res.ok) throw new Error("JSearch API limit reached or invalid key.");
+            if (res.status === 429) throw new Error("JSearch API limit reached. Please update your RapidAPI key in .env.");
+            if (res.status === 403) throw new Error("Invalid JSearch API key. Please check VITE_RAPIDAPI_KEY in .env.");
+            if (!res.ok) throw new Error(`JSearch API Error: ${res.statusText}`);
+
             const data = await res.json();
             setJobs(data.data || []);
         } catch (err: any) {
@@ -47,7 +55,6 @@ export const JobBoard = () => {
 
     useEffect(() => {
         searchJobs();
-        
     }, []);
 
     return (
@@ -80,10 +87,10 @@ export const JobBoard = () => {
                     onChange={e => setRegion(e.target.value)}
                     className="bg-[#161a29] border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:border-blue-500 transition-colors appearance-none cursor-pointer font-semibold min-w-[180px]"
                 >
-                    <option value="Philippines">🇵🇭 Philippines</option>
-                    <option value="Singapore">🇸🇬 Singapore</option>
-                    <option value="United States">🇺🇸 United States</option>
-                    <option value="Remote">🌐 Remote (Global)</option>
+                    <option className="text-gray-900" value="Philippines">🇵🇭 Philippines</option>
+                    <option className="text-gray-900" value="Singapore">🇸🇬 Singapore</option>
+                    <option className="text-gray-900" value="United States">🇺🇸 United States</option>
+                    <option className="text-gray-900" value="Remote">🌐 Remote (Global)</option>
                 </select>
 
                 <button 
@@ -129,10 +136,10 @@ export const JobBoard = () => {
                         <div className="flex flex-col gap-2 pt-4 border-t border-white/5 mt-auto relative z-10">
                             <div className="flex items-center gap-2">
                                 <button 
-                                    onClick={() => setBlastJob(job)}
+                                    onClick={() => setRecommendationJob(job)}
                                     className="flex-1 text-center py-2.5 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/20 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition-all text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm"
                                 >
-                                    <Send size={14} /> Mass Blast
+                                    <Send size={14} /> Recommend to users
                                 </button>
                                 <a 
                                     href={job.job_apply_link} 
@@ -164,12 +171,12 @@ export const JobBoard = () => {
                 </div>
             )}
             
-            <MassBlastModal 
-                isOpen={!!blastJob} 
-                onClose={() => setBlastJob(null)}
-                jobTitle={blastJob?.job_title || ''}
-                employer={blastJob?.employer_name || ''}
-                jobLink={blastJob?.job_apply_link || ''}
+            <RecommendToUsersModal 
+                isOpen={!!recommendationJob} 
+                onClose={() => setRecommendationJob(null)}
+                jobTitle={recommendationJob?.job_title || ''}
+                employer={recommendationJob?.employer_name || ''}
+                jobLink={recommendationJob?.job_apply_link || ''}
             />
 
             <ApplicantViewerModal 

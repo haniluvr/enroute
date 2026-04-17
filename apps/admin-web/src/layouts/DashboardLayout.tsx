@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Database, LogOut, Settings, MessageSquare, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Database, LogOut, Briefcase, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEffect } from 'react';
 
@@ -24,9 +24,6 @@ export const DashboardLayout = () => {
   const tableModules = [
     { path: '/dashboard/tables/learning_paths', label: 'learning_paths', sub: 'Structured educational journeys', icon: Database },
     { path: '/dashboard/learning-modules', label: 'learning_modules', sub: 'Individual lesson items and videos', icon: Database },
-    { path: '/dashboard/tables/user_settings', label: 'user_settings', sub: 'Global app preferences and flags', icon: Settings },
-    { path: '/dashboard/tables/conversations', label: 'conversations', sub: 'AI coaching session headers', icon: MessageSquare },
-    { path: '/dashboard/tables/messages', label: 'messages', sub: 'General system messages', icon: MessageCircle },
   ];
 
   return (
@@ -34,7 +31,7 @@ export const DashboardLayout = () => {
       <aside className="w-[320px] border-r border-white/10 bg-[#0d1326] flex flex-col shrink-0">
         <div className="flex h-20 items-center px-6 border-b border-white/10 shrink-0">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-violet-600 to-blue-500 shadow-lg shadow-violet-500/20">
-            <Settings className="h-5 w-5 text-white" />
+            <Briefcase className="h-5 w-5 text-white" />
           </div>
           <span className="ml-3 text-lg font-bold tracking-wide">Enroute<span className="text-violet-500">Agency</span></span>
         </div>
@@ -76,6 +73,23 @@ export const DashboardLayout = () => {
                 <div className="flex flex-col">
                   <span className="font-bold text-sm tracking-wide">Users</span>
                   <span className="text-xs opacity-70 mt-0.5">Manage user profiles</span>
+                </div>
+            </NavLink>
+
+            <NavLink
+                to="/dashboard/applications"
+                className={({ isActive }) =>
+                  `flex items-center gap-4 rounded-2xl px-5 py-4 transition-all ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                      : 'text-gray-400 bg-white/5 hover:bg-white/10 hover:text-white border border-white/5'
+                  }`
+                }
+              >
+                <Activity className="h-5 w-5" />
+                <div className="flex flex-col">
+                  <span className="font-bold text-sm tracking-wide">Applications</span>
+                  <span className="text-xs opacity-70 mt-0.5">Agency Desk: Review & Recommend</span>
                 </div>
             </NavLink>
 

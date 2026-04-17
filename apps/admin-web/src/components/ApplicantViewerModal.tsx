@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X, Search, Download, ExternalLink, MessageCircle, User as UserIcon, Filter } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Search, Download, User as UserIcon, Filter, Activity } from 'lucide-react';
+import { supabase } from '../config/supabase';
 
 interface Props {
   isOpen: boolean;
@@ -8,17 +9,10 @@ interface Props {
   employer: string;
 }
 
-// Mock Data for presentation
-const MOCK_APPLICANTS = [
-  { id: 1, name: 'Alice Walker', email: 'alice@example.com', status: 'Applied', date: '2026-03-29', experience: 'Mid Level', link: 'https://github.com/alice' },
-  { id: 2, name: 'Bob Smith', email: 'bob@example.com', status: 'Interviewed', date: '2026-03-25', experience: 'Senior', link: 'https://linkedin.com/in/bob' },
-  { id: 3, name: 'Charlie Davis', email: 'charlie@example.com', status: 'Under Review', date: '2026-03-30', experience: 'Entry Level', link: 'https://charliedavis.dev' },
-  { id: 4, name: 'Diana Prince', email: 'diana@example.com', status: 'Offered', date: '2026-03-20', experience: 'Senior', link: 'https://diana-portfolio.com' },
-  { id: 5, name: 'Evan Wright', email: 'evan@example.com', status: 'Rejected', date: '2026-03-15', experience: 'Student', link: 'https://github.com/evan' },
-];
-
 const STATUS_COLORS: Record<string, string> = {
-  'Applied': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  'Recommended': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  'Shortlisted': 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+  'Applied': 'bg-green-500/10 text-green-400 border-green-500/20',
   'Under Review': 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
   'Interviewed': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
   'Offered': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -29,10 +23,121 @@ const STATUS_COLORS: Record<string, string> = {
 export const ApplicantViewerModal = ({ isOpen, onClose, jobTitle, employer }: Props) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [applicants, setApplicants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchApplicants();
+    }
+  }, [isOpen, jobTitle]);
+
+  const fetchApplicants = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch users who were recommended/shortlisted via 'roadmaps' table
+      const { data: roadmapData } = await supabase
+        .from('roadmaps')
+        .select('id, created_at, target_role, user_id, profiles(id, first_name, last_name, email, career_interest)')
+        .or(`target_role.ilike.%${jobTitle}%`)
+        .order('created_at', { ascending: false });
+
+      // 2. Fetch users who applied or were shortlisted via 'job_applications' table
+      const { data: applicationData } = await supabase
+        .from('job_applications')
+        .select('id, created_at, status, user_id, profiles(id, first_name, last_name, email, career_interest)')
+        .or(`job_title.ilike.%${jobTitle}%`)
+        .order('created_at', { ascending: false });
+
+      // Map profiles by ID to merge
+      const candidatesMap = new Map<string, any>();
+
+      // Recommendations first
+      (roadmapData || []).forEach(r => {
+        const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+        if (!profile) return;
+        
+        let status = 'Recommended';
+        if (r.target_role.includes('⭐ Shortlist')) status = 'Shortlisted';
+        if (r.target_role.includes('⭐ Interviewing')) status = 'Interviewed';
+        if (r.target_role.includes('⭐ Hired')) status = 'Hired';
+        if (r.target_role.includes('⭐ Rejected')) status = 'Rejected';
+
+        candidatesMap.set(profile.id, {
+          id: profile.id,
+          roadmapId: r.id,
+          name: `${profile.first_name || 'Unknown'} ${profile.last_name || ''}`,
+          email: profile.email,
+          status: status,
+          date: new Date(r.created_at).toLocaleDateString(),
+          roleName: r.target_role.split(': ')[1] || jobTitle,
+          experience: profile.career_interest || 'Entry Level',
+          link: '#'
+        });
+      });
+
+      // Applications/Shortlists overrides or additions
+      (applicationData || []).forEach(a => {
+        const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
+        if (!profile) return;
+        
+        const existing = candidatesMap.get(profile.id);
+        const status = a.status ? a.status.charAt(0).toUpperCase() + a.status.slice(1).toLowerCase() : 'Applied';
+        
+        candidatesMap.set(profile.id, {
+          ...(existing || {}),
+          id: profile.id,
+          appId: a.id,
+          name: `${profile.first_name || 'Unknown'} ${profile.last_name || ''}`,
+          email: profile.email,
+          status: status,
+          date: new Date(a.created_at).toLocaleDateString(),
+          experience: profile.career_interest || 'Entry Level',
+          link: '#'
+        });
+      });
+
+      setApplicants(Array.from(candidatesMap.values()));
+    } catch (err) {
+      console.error("Error fetching applicants:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStatus = async (appId: string | undefined, userId: string, newStatus: string, roadmapId?: string, roleName?: string) => {
+    try {
+      if (appId) {
+        // Update real application
+        await supabase.from('job_applications').update({ status: newStatus.toLowerCase() }).eq('id', appId);
+      } else if (roadmapId) {
+        // Update admin recommendation/shortlist prefix
+        let prefix = '⭐ Job Match';
+        if (newStatus === 'Shortlisted') prefix = '⭐ Shortlisted';
+        if (newStatus === 'Interviewed') prefix = '⭐ Interviewing';
+        if (newStatus === 'Hired') prefix = '⭐ Hired';
+        if (newStatus === 'Rejected') prefix = '⭐ Rejected';
+        
+        await supabase.from('roadmaps').update({ 
+            target_role: `${prefix}: ${roleName || jobTitle}` 
+        }).eq('id', roadmapId);
+      } else {
+        // If no application record exists yet, create one (Fallback)
+        await supabase.from('job_applications').insert({
+          user_id: userId,
+          job_id: '00000000-0000-0000-0000-000000000000', // Dummy UUID if required
+          status: newStatus.toLowerCase()
+        });
+      }
+      fetchApplicants();
+    } catch (err) {
+      console.error("Error updating status:", err);
+    }
+  };
 
   if (!isOpen) return null;
 
-  const filteredApplicants = MOCK_APPLICANTS.filter(a => {
+  const filteredApplicants = applicants.filter(a => {
     const matchesSearch = a.name.toLowerCase().includes(search.toLowerCase()) || a.email.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'All' || a.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -82,13 +187,15 @@ export const ApplicantViewerModal = ({ isOpen, onClose, jobTitle, employer }: Pr
                onChange={e => setStatusFilter(e.target.value)}
                className="appearance-none bg-[#161a29] border border-white/5 rounded-xl py-3 pl-11 pr-10 text-sm text-white focus:border-violet-500 outline-none transition-colors font-semibold cursor-pointer"
              >
-               <option value="All">All Statuses</option>
-               <option value="Applied">Applied</option>
-               <option value="Under Review">Under Review</option>
-               <option value="Interviewed">Interviewed</option>
-               <option value="Offered">Offered</option>
-               <option value="Hired">Hired</option>
-               <option value="Rejected">Rejected</option>
+                <option className="text-gray-900" value="All">All Statuses</option>
+                <option className="text-gray-900" value="Recommended">Recommended</option>
+                <option className="text-gray-900" value="Shortlisted">Shortlisted</option>
+                <option className="text-gray-900" value="Applied">Applied</option>
+                <option className="text-gray-900" value="Under Review">Under Review</option>
+                <option className="text-gray-900" value="Interviewed">Interviewed</option>
+                <option className="text-gray-900" value="Offered">Offered</option>
+                <option className="text-gray-900" value="Hired">Hired</option>
+                <option className="text-gray-900" value="Rejected">Rejected</option>
              </select>
            </div>
         </div>
@@ -107,7 +214,14 @@ export const ApplicantViewerModal = ({ isOpen, onClose, jobTitle, employer }: Pr
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {filteredApplicants.length > 0 ? filteredApplicants.map(app => (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="p-12 text-center text-gray-500">
+                        <Activity className="w-12 h-12 mx-auto mb-3 animate-spin text-violet-500" />
+                        <p>Loading actual applicants...</p>
+                      </td>
+                    </tr>
+                  ) : filteredApplicants.length > 0 ? filteredApplicants.map(app => (
                     <tr key={app.id} className="hover:bg-white/[0.02] transition-colors group">
                        <td className="p-4">
                          <p className="font-bold text-white group-hover:text-blue-300 transition-colors">{app.name}</p>
@@ -116,26 +230,25 @@ export const ApplicantViewerModal = ({ isOpen, onClose, jobTitle, employer }: Pr
                        <td className="p-4 text-sm text-gray-400">{app.date}</td>
                        <td className="p-4 text-sm font-medium text-gray-300">{app.experience}</td>
                        <td className="p-4">
-                         <span className={`px-3 py-1 text-xs font-bold uppercase rounded-md border ${STATUS_COLORS[app.status]}`}>
+                         <span className={`px-3 py-1 text-xs font-bold uppercase rounded-md border ${STATUS_COLORS[app.status] || ''}`}>
                            {app.status}
                          </span>
                        </td>
                        <td className="p-4">
                          <div className="flex items-center justify-center gap-2">
-                            <button className="p-2 bg-white/5 hover:bg-blue-500/20 hover:text-blue-400 text-gray-400 rounded-lg transition-colors tooltip" title="Message">
-                               <MessageCircle className="w-4 h-4" />
-                            </button>
-                            <a href={app.link} target="_blank" rel="noreferrer" className="p-2 bg-white/5 hover:bg-emerald-500/20 hover:text-emerald-400 text-gray-400 rounded-lg transition-colors tooltip" title="View Portfolio">
-                               <ExternalLink className="w-4 h-4" />
-                            </a>
-                            <select className="bg-[#161a29] border border-white/10 text-xs text-gray-300 rounded-lg p-2 outline-none cursor-pointer">
-                              <option>Update Status...</option>
-                              <option>Applied</option>
-                              <option>Under Review</option>
-                              <option>Interviewed</option>
-                              <option>Offered</option>
-                              <option>Hired</option>
-                              <option>Rejected</option>
+                            <select 
+                              onChange={(e) => updateStatus(app.appId, app.id, e.target.value, app.roadmapId, app.roleName)}
+                              className="bg-[#161a29] border border-white/10 text-xs text-gray-300 rounded-lg p-2 outline-none cursor-pointer"
+                            >
+                              <option className="text-gray-900" value="">Update Status...</option>
+                              <option className="text-gray-900" value="Recommended">Recommended</option>
+                              <option className="text-gray-900" value="Shortlisted">Shortlisted</option>
+                              <option className="text-gray-900" value="Applied">Applied</option>
+                              <option className="text-gray-900" value="Under Review">Under Review</option>
+                              <option className="text-gray-900" value="Interviewed">Interviewed</option>
+                              <option className="text-gray-900" value="Offered">Offered</option>
+                              <option className="text-gray-900" value="Hired">Hired</option>
+                              <option className="text-gray-900" value="Rejected">Rejected</option>
                             </select>
                          </div>
                        </td>
@@ -144,7 +257,7 @@ export const ApplicantViewerModal = ({ isOpen, onClose, jobTitle, employer }: Pr
                     <tr>
                        <td colSpan={5} className="p-12 text-center text-gray-500">
                          <UserIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                         <p>No applicants found matching your criteria.</p>
+                         <p>No actual recommended or applied users found for this job.</p>
                        </td>
                     </tr>
                   )}

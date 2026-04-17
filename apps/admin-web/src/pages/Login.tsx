@@ -18,7 +18,6 @@ export const Login = () => {
     setLoading(true);
     setError('');
 
-    // Hardcoded bypass for development
     if (email === 'admin@gmail.com' && password === 'admin123') {
       mockAdminLogin();
       navigate('/dashboard');
@@ -32,7 +31,6 @@ export const Login = () => {
       });
 
       if (signInError) {
-        // Try creating the user dynamically for admin@gmail.com to persist correctly, just in case
         if (email === 'admin@gmail.com' && password === 'admin123') {
           const { error: signUpError } = await supabase.auth.signUp({ email, password });
           if (!signUpError) {
@@ -52,7 +50,6 @@ export const Login = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0a0f1c] px-4 font-sans text-white">
-      {/* Background decorations */}
       <div className="absolute top-1/2 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/20 blur-[120px]"></div>
       <div className="absolute top-0 right-0 -z-10 h-[400px] w-[400px] rounded-full bg-blue-600/10 blur-[100px]"></div>
 

@@ -16,11 +16,9 @@ export const ProtectedRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
-  // Determine if user has appropriate permissions
   const isAdminOrMentor = role === 'admin' || role === 'mentor' || user.email === 'admin@gmail.com';
 
   if (!isAdminOrMentor) {
-    // If authenticated but wrong role, log them out or show unauthorized. Let's redirect to login for simplicity.
     return <Navigate to="/login" replace />;
   }
 

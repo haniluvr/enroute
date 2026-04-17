@@ -9,6 +9,7 @@ import { UserProfile } from './pages/UserProfile';
 import { RowViewer } from './pages/RowViewer';
 import { JobBoard } from './pages/JobBoard';
 import { LearningModules } from './pages/LearningModules';
+import { Applications } from './pages/Applications';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardOverview />} />
           <Route path="/dashboard/jobs" element={<JobBoard />} />
+          <Route path="/dashboard/applications" element={<Applications />} />
           <Route path="/dashboard/users" element={<UsersManagement />} />
           <Route path="/dashboard/users/:id" element={<UserProfile />} />
           <Route path="/dashboard/learning-modules" element={<LearningModules />} />

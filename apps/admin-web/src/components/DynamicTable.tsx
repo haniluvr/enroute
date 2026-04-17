@@ -11,14 +11,12 @@ export const DynamicTable: React.FC<DynamicTableProps> = ({ data, columns, onRow
   const navigate = useNavigate();
   const { tableName } = useParams();
 
-  // Utility for truncated or array display
   const renderCell = (value: any) => {
     if (value === null || value === undefined) return <span className="text-gray-600">-</span>;
     if (typeof value === 'boolean') return value ? 'true' : 'false';
     if (Array.isArray(value)) return `[${value.length} items]`;
     if (typeof value === 'object') return '{...}';
     
-    // String truncation
     const str = String(value);
     if (str.length > 40) {
       return (

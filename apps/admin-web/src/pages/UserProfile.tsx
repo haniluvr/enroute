@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
-import { ArrowLeft, Route, Activity, MessageCircle, Target, Briefcase, Plus, Send, X, Calendar, BookOpen, PlayCircle, ChevronRight, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Route, Activity, MessageCircle, Target, Briefcase, Send, X, Calendar, BookOpen, PlayCircle, ChevronRight, Link as LinkIcon } from 'lucide-react';
 import { SlideOver } from '../components/SlideOver';
 import { ChatViewer } from '../components/ChatViewer';
 import { VideoModal } from '../components/VideoModal';
@@ -14,6 +14,7 @@ export const UserProfile = () => {
     const [roadmapSteps, setRoadmapSteps] = useState<any[]>([]);
     const [conversations, setConversations] = useState<any[]>([]);
     const [cv, setCv] = useState<any>(null);
+    const [completions, setCompletions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     
     const [showRecModal, setShowRecModal] = useState(false);
@@ -49,6 +50,9 @@ export const UserProfile = () => {
                 const { data: cvScans } = await supabase.from('cv_scans').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(1);
                 setCv(cvScans?.[0] || null);
 
+                const { data: userCompletions } = await supabase.from('user_module_completions').select('*').eq('user_id', id);
+                setCompletions(userCompletions || []);
+
             } catch (err) {
                 console.error("Failed to load user details", err);
             } finally {
@@ -58,6 +62,26 @@ export const UserProfile = () => {
 
         fetchUserData();
     }, [id]);
+
+    const handleShortlist = async (rmap: any) => {
+        const role = rmap.target_role?.replace('⭐ Job Match: ', '') || '';
+        if (!confirm(`Are you sure you want to shortlist this user for ${role}?`)) return;
+        
+        try {
+            const { error } = await supabase.from('roadmaps').insert({
+                user_id: id,
+                target_role: `⭐ Shortlist: ${role}`,
+                goal: 'Manual recruitment shortlist for agency opportunities.',
+                current_level: 'entry',
+                estimated_time: 'Shortlisted',
+                is_completed: false
+            });
+            if (error) throw error;
+            alert(`User successfully added to ${role} shortlist!`);
+        } catch (err: any) {
+            alert(`Shortlist failed: ${err.message}`);
+        }
+    };
 
     const handlePushRecommendation = async () => {
         if (!recJobTitle || !recEmployer || !recLink) return alert("Title, Employer, and Application Link are all required.");
@@ -90,7 +114,8 @@ export const UserProfile = () => {
     if (loading) return <div className="p-8 text-gray-400">Loading user data...</div>;
     if (!user) return <div className="p-8 text-red-400">User Record not found</div>;
 
-    const skillRating = Math.min((roadmaps.length * 15) + (conversations.length * 5) + (cv ? 20 : 0) + 30, 98);
+    const completionRate = roadmapSteps.length > 0 ? (completions.length / roadmapSteps.length) * 100 : 0;
+    const skillRating = Math.min(Math.round(completionRate + (cv ? 15 : 0) + (conversations.length * 2) + 5), 100);
 
     return (
         <div className="max-w-7xl space-y-6 pb-20 relative">
@@ -117,9 +142,6 @@ export const UserProfile = () => {
                                         <BookOpen size={16} /> View CV
                                     </button>
                                 )}
-                                <button onClick={() => setShowRecModal(true)} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 flex items-center gap-2 transition-all">
-                                    <Plus size={16} /> Recommend Job
-                                </button>
                                 <div className="text-right border-l border-white/10 pl-6">
                                     <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Recruit Readiness</p>
                                     <div className="flex items-end justify-end gap-1 text-emerald-400">
@@ -168,36 +190,62 @@ export const UserProfile = () => {
                 <div className="col-span-1 space-y-4">
                     <div className="flex items-center justify-between mb-4 px-2">
                         <h3 className="font-bold flex items-center gap-2 text-white"><Route size={18} className="text-blue-400" /> Learning Paths</h3>
-                        <span className="text-xs font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{roadmaps.length} total</span>
+                        <span className="text-xs font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{roadmaps.filter(r => !r.target_role?.includes('⭐')).length} total</span>
                     </div>
-                    {roadmaps.length > 0 ? roadmaps.map(rmap => (
-                        <div key={rmap.id} className="bg-white/10 border-t border-white/20 rounded-2xl p-5 backdrop-blur-md cursor-pointer hover:bg-white/15 transition-all shadow-xl shadow-black/20" onClick={() => { setSelectedPath(rmap); setIsPathViewerOpen(true); }}>
+                    {roadmaps.filter(r => !r.target_role?.includes('⭐')).length > 0 ? roadmaps.filter(r => !r.target_role?.includes('⭐')).map(rmap => (
+                        <div key={rmap.id} className="bg-[#161a29] border border-white/10 hover:border-white/20 hover:bg-white/5 rounded-2xl p-5 cursor-pointer transition-all" onClick={() => { setSelectedPath(rmap); setIsPathViewerOpen(true); }}>
                             <div className="flex justify-between items-start mb-3">
-                                <div className="w-12 h-12 rounded-2xl items-center justify-center bg-white/10 shadow-lg shadow-white/5 flex">
-                                    <Briefcase size={24} className={rmap.target_role?.includes('⭐') ? 'text-blue-400' : 'text-white'} />
+                                <div className="w-10 h-10 rounded-xl items-center justify-center bg-white/5 flex">
+                                    <Route size={20} className="text-blue-400" />
                                 </div>
-                                <div className="w-8 h-8 rounded-full bg-white/10 items-center justify-center flex">
-                                    <ChevronRight size={18} className="text-gray-400" />
-                                </div>
+                                <ChevronRight size={18} className="text-gray-600" />
                             </div>
-                            <h4 className="text-white font-bold text-base mb-1 line-clamp-1">
-                                {rmap.target_role || 'General Setup'}
-                            </h4>
-                            <p className="text-gray-400 font-medium text-sm mb-3 line-clamp-2">
-                                {rmap.goal || rmap.current_level || 'No overview provided.'}
-                            </p>
-                            <div className="bg-white/5 rounded-xl px-4 py-2.5 mt-1 inline-flex">
-                                <div className="flex items-center">
-                                    <Calendar color="#888" size={14} className="mr-1.5" />
-                                    <span className="text-gray-500 font-medium text-xs">
-                                        Added: {new Date(rmap.created_at).toLocaleDateString()}
-                                    </span>
-                                </div>
+                            <h4 className="text-white font-bold text-sm mb-1 line-clamp-1">{rmap.target_role || 'General Setup'}</h4>
+                            <p className="text-gray-500 text-xs mb-3 line-clamp-2">{rmap.goal || 'Custom learning journey'}</p>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-600 font-mono">
+                                <Calendar size={10} /> {new Date(rmap.created_at).toLocaleDateString()}
                             </div>
                         </div>
                     )) : (
-                        <div className="p-8 text-center bg-white/5 backdrop-blur-md border hover:bg-white/10 transition-colors border-white/10 rounded-2xl">
+                        <div className="p-8 text-center bg-[#161a29] border border-white/10 rounded-2xl">
                             <p className="text-gray-500 text-sm">No paths generated.</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="col-span-1 space-y-4">
+                    <div className="flex items-center justify-between mb-4 px-2">
+                        <h3 className="font-bold flex items-center gap-2 text-white"><Target size={18} className="text-fuchsia-400" /> Job Recommendations</h3>
+                        <span className="text-xs font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{roadmaps.filter(r => r.target_role?.includes('⭐ Job Match:')).length} sent</span>
+                    </div>
+                    {roadmaps.filter(r => r.target_role?.includes('⭐ Job Match:')).length > 0 ? roadmaps.filter(r => r.target_role?.includes('⭐ Job Match:')).map(rmap => (
+                        <div key={rmap.id} className="bg-blue-600/10 border border-blue-500/20 hover:border-blue-500/40 rounded-2xl p-5 cursor-pointer transition-all shadow-lg shadow-blue-500/5" onClick={() => { setSelectedPath(rmap); setIsPathViewerOpen(true); }}>
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="w-10 h-10 rounded-xl items-center justify-center bg-blue-500/20 flex">
+                                    <Briefcase size={20} className="text-blue-400" />
+                                </div>
+                                <ChevronRight size={18} className="text-blue-400/50" />
+                            </div>
+                            <h4 className="text-white font-bold text-sm mb-1 line-clamp-1">{rmap.target_role?.replace('⭐ Job Match: ', '')}</h4>
+                            <p className="text-blue-200/60 text-xs mb-3 line-clamp-2">{rmap.goal || 'Recommended by Agency'}</p>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-[10px] text-blue-400/50 font-mono uppercase tracking-tighter">
+                                    <Activity size={10} /> Endorsed {new Date(rmap.created_at).toLocaleDateString()}
+                                </div>
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleShortlist(rmap);
+                                    }}
+                                    className="px-3 py-1 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-bold rounded-lg uppercase tracking-widest transition-colors"
+                                >
+                                    Shortlist
+                                </button>
+                            </div>
+                        </div>
+                    )) : (
+                        <div className="p-8 text-center bg-[#161a29] border border-white/10 rounded-2xl">
+                            <p className="text-gray-500 text-sm">No recommendations yet.</p>
                         </div>
                     )}
                 </div>
@@ -219,14 +267,11 @@ export const UserProfile = () => {
                            
                            <h4 className="font-bold text-base text-white mb-2 line-clamp-1 pr-6 relative z-10">{step.title}</h4>
                            
-                           {/* URL Renderer */}
                            {(step.content_url || step.url) && (
                                <a href={step.content_url || step.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-medium mb-3 relative z-10 truncate max-w-[85%]">
                                    <LinkIcon size={12} /> <span className="underline truncate">{(step.content_url || step.url).replace(/^https?:\/\//, '')}</span>
                                </a>
                            )}
-                           
-                           <p className="text-sm text-gray-400 font-medium line-clamp-2 mb-4 relative z-10">{step.description}</p>
                            
                            <div className="flex items-center gap-2 pt-3 relative z-10">
                                {step.educational_platform && (

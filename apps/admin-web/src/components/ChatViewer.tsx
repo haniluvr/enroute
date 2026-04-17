@@ -54,7 +54,6 @@ export const ChatViewer = ({ conversationId }: { conversationId: string }) => {
                 {messages.map((msg, idx) => {
                     const isAi = msg.role === 'assistant' || msg.role === 'bot' || msg.role === 'system';
                     
-                    // Grouping logic: combine if previous message was from the same role
                     const prevMsg = idx > 0 ? messages[idx - 1] : null;
                     const isSameRoleAsPrev = prevMsg && (
                         (isAi && (prevMsg.role === 'assistant' || prevMsg.role === 'bot' || prevMsg.role === 'system')) ||
@@ -63,12 +62,10 @@ export const ChatViewer = ({ conversationId }: { conversationId: string }) => {
 
                     return (
                         <div key={msg.id || idx} className={`flex items-end gap-3 ${isAi ? 'flex-row' : 'flex-row-reverse'} ${isSameRoleAsPrev ? 'mt-1' : 'mt-6'}`}>
-                            {/* Avatar (only show if it's the last message in a grouped block, or just hide if same as previous to combine visually) */}
                             <div className={`w-8 h-8 rounded-full flex flex-shrink-0 items-center justify-center transition-opacity ${isSameRoleAsPrev ? 'opacity-0' : 'opacity-100'} ${isAi ? 'bg-blue-600' : 'bg-white/10'}`}>
                                 {!isSameRoleAsPrev && (isAi ? <Bot size={16} className="text-white" /> : <User size={16} className="text-gray-400" />)}
                             </div>
 
-                            {/* Bubble */}
                             <div className={`
                                 max-w-[80%] p-5 rounded-3xl leading-relaxed text-[15px] shadow-sm
                                 ${isAi 
