@@ -1,0 +1,49 @@
+﻿# Enroute Career Navigation App (Powered by Dahlia AI)
+
+Enroute is an AI-powered career assistant tool designed to help High School Students, University Students, and Career Switchers navigate their next steps. Built with a sleek dark-mode interface and vibrant accents, it utilizes an AI mentor named Dahlia.
+
+## Architecture
+This repository is configured as a monorepo containing three distinct applications:
+1. **Mobile App**: React Native (Expo) - The primary interface for students.
+2. **Admin Web App**: React (Vite) - Dashboard for Counselors and Mentors.
+3. **Backend API**: Node.js & Express - Microservice for heavy AI logic, CV parsing, and scheduling.
+4. **Database & Auth**: Supabase - The single source of truth connecting all clients.
+
+*(Note: The apps currently reside in the `apps/` directory, which will be generated soon).*
+
+## System Requirements
+- Node.js (v18+)
+- Supabase Project setup (with PostgreSQL and Auth enabled)
+- Expo CLI (`npm i -g expo-cli`)
+
+## Getting Started
+
+To run the full stack locally:
+
+### 1. Mobile App (Expo)
+```bash
+cd apps/mobile
+npm install
+npx expo start
+```
+
+### 2. Admin Web App (Vite React)
+```bash
+cd apps/admin-web
+npm install
+npm run dev
+```
+
+### 3. Landing Web App (Vite React)
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+### 4. Express AI Backend
+```bash
+cd apps/backend
+npm install
+npm run dev
+```

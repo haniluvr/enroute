@@ -1,0 +1,51 @@
+# Enroute Tech Stack Specification
+
+## Core Stack Architecture (Hybrid Rapid-Dev Setup)
+
+To ensure rapid iteration while maintaining the power of custom AI integrations, we are using a hybrid backend approach. 
+
+| Layer | Technology | Responsibility / Why Chosen |
+|-------|------------|-----------------------------|
+| **Mobile Frontend** | React Native (Expo) | Cross-platform (iOS/Android), rapid iteration, UI consistency. |
+| **Admin Web Frontend** | React.js (Vite) | Fast, dashboard-oriented web app for Mentors and Counselors. |
+| **Primary Database & Auth** | Supabase (Auth, PostgreSQL, Storage) | Handles user authentication, real-time sync, offline support, and file/CV storage. Allows the mobile app to be built rapidly without writing basic CRUD endpoints, leveraging Row Level Security (RLS). |
+| **Backend Microservice** | Node.js + Express | Handles heavy lifting: Dahlia AI interaction logic, CV parsing, web scraping (if necessary), scheduled jobs, and complex matching algorithms. Interacts securely with PostgreSQL via `@supabase/supabase-js` using a Service Role Key. |
+| **Styling** | Tailwind CSS / NativeWind | Dark-mode native, rapid UI prototyping, shared design language between Mobile and Web. |
+
+*(Note: We deliberately exclude n8n for the MVP to reduce infrastructure overhead. All automation and heavy logic lives in Node.js).*
+
+## Versioning & Dependencies
+- **Mobile**: React Native (latest compatible with Expo SDK 50+).
+- **Web**: React 18, Vite.
+- **Backend**: Node >= 18.x, Express 4.x.
+- **Database**: `@supabase/supabase-js` v2+.
+
+## Infrastructure & Data Flow
+
+```text
+[ Mobile App (Expo) ]         [ Admin Web App (Vite) ]
+       \                              /
+        \                            /
+      (Direct DB Reads & Standard CRUD via PostgREST)
+          \                        /
+           v                      v
+        [ Supabase (PostgreSQL / Auth) ]
+                   ^
+                   | (Supabase JS client bypassing RLS via Service Role Key)
+                   v
+       [ Node.js / Express Backend API ]
+             /                     \
+            /                       \
+   [ External AI APIs ]     [ Scraping / Jobs / Analytics Gen ]
+```
+
+## Integration Principles
+1. **Frontend to Supabase**: The Expo app and Vite app should directly read/write simple data to PostgreSQL via Supabase's auto-generated APIs.
+2. **Frontend to Express**: For heavy operations (Dahlia), the frontend sends a secure HTTP request.
+3. **Custom Dahlia AI Pipeline**:
+   - **Data Layer**: PostgreSQL holds user profile context.
+   - **Knowledge Base (RAG)**: A dedicated vector database (e.g., Pinecone or pgvector in Supabase) holding scraped Philippine career data, university details, and TESDA credentials.
+   - **Generative Engine**: A distinct AI microservice (Python + FastAPI) or integrated directly into Node.js (via LangChain), which queries a fine-tuned model (e.g., OpenAI customized specifically for empathy) combined with the internal RAG data. This ensures "Dahlia" acts exclusively as a career mentor.
+4. **Express to Supabase**: The Express backend processes the AI task and writes the result back into PostgreSQL via the Supabase client utilizing the Service Role Key.
+
+> **Crucial Rule**: Do NOT build a traditional REST API for every single resource. Leverage Supabase (PostgREST) for standard CRUD, and use Express strictly for intensive/secure tasks.

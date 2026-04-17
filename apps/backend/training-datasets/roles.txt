@@ -1,0 +1,72 @@
+# What is a Frontend Developer
+A frontend developer is a professional who uses HTML, CSS, and JavaScript to design and build the visual and interactive elements of websites and applications that users engage with directly. They ensure the interface is responsive, accessible, and visually appealing. Every feature you see and interact with on a website (like buttons, menus, and animations) is created by a frontend developer.
+
+What is the role of a Frontend Developer?
+While this is not a complete frontend developer job description, the following can be considered as a great introduction to the role of a frontend developer: you'll be responsible for creating the user interface of a website to ensure it looks good and is easy to use, with a great focus on design principles and user experience. You'll be working closely with designers, back-end developers, and project managers to make sure the final product meets the client's needs and provides the best possible experience for the end-users.
+
+Which languages are used for Frontend Development?
+The easy part about the frontend development role is that there aren’t that many options to choose from when it comes to frontend languages and technologies (unlike with backend development).
+
+As a frontend developer, you’ll be working with the following technologies:
+
+HTML: The markup language used to create the skeleton of the page. All the information you want to show on a webpage will be laid out through HTML.
+
+CSS: The Cascading Style Sheet language allows you to adjust the way in which the HTML elements are rendered, improving the visuals of your webpage.
+
+JavaScript: This is the de facto programming language for frontend development, and it allows you to add dynamism to your websites/web apps. There is an alternative known as TypeScript, which is a strongly typed superset of JavaScript that you can use instead. However, in that scenario, you’d have to set up a transpiler to translate your code into JavaScript before being able to run it in the browser.
+
+What skills are required for a Frontend developer?
+The main skills required to become a frontend developer are HTML, CSS, and JavaScript. The rest are also important, but without those three basic ones, you can’t apply any of the others.
+
+The full list of frontend developer skills you should look into if you’re hoping to up your game is the following:
+
+1. Understanding the core technologies: HTML, CSS & JavaScript.
+2. Understanding accessibility: Knowing how it can affect your users' experience.
+3. Version control systems: Be familiar with tools like Git.
+4. Responsive design: Implementing designs that adapt to different devices and screen sizes.
+5. User experience (UX): Understanding the basics of UX principles.
+6. SEO: Knowing how search engine optimization works and how you can leverage it in your code.
+7. RESTful APIs: Understanding the basics of RESTful APIs and how to consume them.
+8. Testing and debugging: Implementing testing practices and debugging effectively.
+9. Dev tools: Master the browser’s developer tools for inspecting, debugging, and optimizing code.
+10. Frameworks: Having a go-to frontend framework (like React or Vue) and understanding others at a high level.
+11. Web performance: Understanding web performance optimizations and core web vitals.
+12. TypeScript: Understanding how TypeScript works and when to use it.
+
+# What is a Backend Developer?
+Backend development refers to the server-side aspect of web development, focusing on creating and managing the server logic, databases, and APIs. It involves handling user authentication, authorization, and processing user requests, typically using backend development languages such as Python, Java, Ruby, PHP, JavaScript (Node.js), and .NET.
+
+What does a Backend Developer do?
+A backend developer focuses on creating and maintaining the server-side components of web applications. They are primarily tasked with developing server-side APIs, handling database operations, and ensuring that the backend can manage high traffic volumes efficiently. Key responsibilities include integrating external services such as payment gateways and cloud services, and enhancing the performance and scalability of systems. This role is crucial for processing and securing data, serving as the backbone that supports frontend developers in delivering a seamless user experience.
+
+# What is a Full Stack Developer
+A Full Stack Developer is someone who can work on both the front-end and the back-end of an application. They write code and, most of the time, also take care of everything required to push the product into production.
+
+Full stack developers (also known as full stack web developers) will usually have the required skills to tackle any part of the web development process. In the front end, they'll focus on building the user interface using technologies such as HTML, JavaScript, and CSS (Cascading Style Sheets - usually mixed with some UI framework such as React or Vue). For the back-end side of these projects, they will code the business logic and any type of data access required involving either some SQL database or, in some projects, noSQL options. As part of the back-end, there might also be some API design involved, as well as other performance and scalability optimizations that need to be performed.
+
+As a summary, you could say that a full stack developer is a "jack of all trades" when it comes to web development. While they might not always be the absolute experts in any of those technologies, they're more than capable of filling any gaps in the team.
+
+What languages are used in Full Stack Development?
+In full stack development, the languages used can range from just 3 to a multitude of options.
+
+For the front-end there aren't that many options; you can only use HTML, CSS, and JavaScript (with the freedom of picking the framework that best suits your preferences). However, on the back-end, the story is quite different. Of course, you can pick JavaScript, keeping the full tech stack homogenous, but you also have the option to add multiple programming languages if you're going with a microservices-based architecture, using the right language for each service. If that's your situation, some of the most popular languages include Python, Ruby, Java, PHP, or C#.
+
+And to top it all out, you'll often use something like SQL (Structured Query Language) for your database interactions (unless you're going with a NoSQL database).
+
+What skills do I need to become a Full Stack Developer?
+To become a full stack developer, the skills you'll need are very varied. You'll need to understand both front-end and back-end software development, including some of the most popular frameworks and libraries.
+
+That means you'll have to know how to turn designs into good user interfaces following the latest UX trends. In the back-end, you'll need to grasp server-side programming, work with databases, manage APIs, and ensure that everything integrates as it should. And you'll do all of that as part of your regular development process.
+
+On top of all of this, other key full stack developer skills that would enhance your profile are version control systems (such as Git which is the current industry standard) and understanding RESTful APIs.
+
+Of course, strong problem-solving abilities, debugging skills, and a willingness to continuously learn new technologies are also crucial for this role, like they are for any software development job.
+
+In the end, this particular blend of skills allows developers to build full-featured web applications from start to finish.
+
+How do I become a Full Stack Developer?
+To become a full stack developer, you need to start by learning the basics of HTML, CSS, and JavaScript, they will give you everything you need to master front-end development.
+
+Once you're ready, you can then pick up a back-end language such as Python or Java (or even JavaScript again through Node.js). Try to start small and build a simple back-end for your website. A good idea here is to pick up a full stack framework, such as NextJS or Django; they will make it easy for you to integrate the back-end into your project. Slowly start introducing database management into the mix. This will open up the door to more complex applications. Just remember to start with small projects to practice your full stack developer skills and gradually work on more complex ones.
+
+As a long-term learning plan, creating a portfolio to showcase your progress can be a great motivator. Consider following roadmaps like the full stack roadmap, and keep learning through online courses or bootcamps to boost your journey into full stack development.

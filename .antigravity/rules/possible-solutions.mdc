@@ -1,0 +1,47 @@
+# Enroute: Possible Solutions Matrix
+
+This document outlines alternative approaches for key technical challenges, with recommendations based on feasibility, cost, and alignment with project goals.
+
+## 1. AI Assistant Implementation: n8n vs. Firebase Functions vs. Dedicated Backend
+
+| Approach | Pros | Cons | Recommendation |
+|----------|------|------|----------------|
+| **n8n Workflows** | • Low-code, visual editing for counselors<br>• Auditable logs<br>• Handles async tasks well (PDF gen, email) | • Steeper learning curve for devs<br>• Limited debugging tools<br>• Requires self-hosting | ✅ **Recommended** for orchestration (job agg, resume gen, notifications). Use for non-real-time workflows. |
+| **Firebase Cloud Functions** | • Seamless integration with Firestore<br>• Auto-scaling, pay-per-use<br>• Easy deployment | • Cold starts hurt real-time UX<br>• Harder to visualize complex logic | ⚠️ Use for real-time, low-latency tasks: `onCreate` for CV analysis, `onUpdate` for roadmap triggers. |
+| **Dedicated Node.js Backend** | • Full control, complex business logic<br>• Better for ML inference | • High ops overhead<br>• Deviates from "zero-cloud-cost" constraint | ❌ Avoid. Contradicts project’s budget and sustainability goals. |
+
+> **Final Decision**: Hybrid model. n8n for heavy automation, Cloud Functions for real-time user interactions.
+
+## 2. Career Matching Algorithm: Rule-Based vs. ML Model
+
+| Approach | Pros | Cons | Recommendation |
+|----------|------|------|----------------|
+| **Rule-Based (Weighted Scoring)** | • Transparent ("Why this job?")<br>• Easy to tune via n8n<br>• No training data needed | • Less adaptive to subtle patterns<br>• Requires manual weight tuning | ✅ **Recommended** for MVP. Use weights: Location (40%), Skills (35%), Salary (15%), Demand (10%). |
+| **ML Model (e.g., Cosine Similarity)** | • Learns from user swipes<br>• Higher accuracy long-term | • Needs 10k+ data points<br>• "Black box" reduces trust<br>• RA 10173 compliance harder | ⏳ Phase 2. Start with rule-based; collect swipe data; train model after 500+ users. |
+
+## 3. CV Analysis: Local Parser vs. Cloud API
+
+| Approach | Pros | Cons | Recommendation |
+|----------|------|------|----------------|
+| **Local (PDF.js + NLP)** | • Full data privacy<br>• No API costs | • Low accuracy for complex layouts<br>• Hard to maintain | ⚠️ Use for basic text extraction only. |
+| **Cloud API (e.g., DocuSign, AWS Textract)** | • High accuracy<br>• Handles tables, forms | • Cost per doc ($0.0015/doc)<br>• PII leaves Philippines | ❌ Avoid. Violates RA 10173 unless strict BAA signed. |
+| **Hybrid (Local + Rule-Based)** | • Extract text locally<br>• Match skills against curated list | • Moderate accuracy<br>• Fully on-premise | ✅ **Recommended**. Use PDF.js to extract text, then regex + keyword matching against `skills_db` collection.
+
+> **Key Principle**: Prioritize privacy, transparency, and maintainability over marginal accuracy gains.
+
+## 4. Offline Support Strategy
+
+| Approach | Feasibility | Impact | Recommendation |
+|----------|-------------|--------|----------------|
+| **Cache-Only** (Firestore offline persistence) | High | Medium | ✅ Enable `enablePersistence()`; cache `careers`, `institutions`, `roadmaps` |
+| **Service Worker (Web)** | Low (React Native) | Low | ❌ Not applicable for Expo apps. |
+| **Local DB Sync** (SQLite + background sync) | Medium | High | ⏳ Phase 2. Use WatermelonDB for complex offline scenarios. |
+
+## 5. Voice Interaction: Web Speech API vs. Expo AV
+
+| Approach | Pros | Cons | Recommendation |
+|----------|------|------|----------------|
+| **Expo AV** | • Works on iOS/Android<br>• Integrated with React Native | • Limited transcription quality<br>• No speaker diarization | ✅ **Recommended** for MVP. Use `Audio.Recording` + `expo-speech` for TTS. |
+| **Cloud STT (Google Speech)** | • High accuracy<br>• Supports multiple languages | • Cost ($0.006/min)<br>• PII risk | ❌ Avoid for now; revisit in Phase 2 with budget approval. |
+
+> **Summary**: The "possible solutions" matrix favors pragmatic, privacy-first, and maintainable choices. All recommendations align with the project’s constraints: zero cloud budget, RA 10173 compliance, and student-developer sustainability.

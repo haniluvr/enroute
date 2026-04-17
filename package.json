@@ -1,0 +1,23 @@
+{
+  "name": "enroute-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "dev:admin": "npm run dev -w admin-web",
+    "dev:web": "npm run dev -w web",
+    "dev:backend": "npm run dev -w backend",
+    "dev:mobile": "npm run start -w mobile",
+    "build:admin": "npm run build -w admin-web",
+    "build:web": "npm run build -w web",
+    "dev:all": "concurrently \"npm run dev:admin\" \"npm run dev:web\" \"npm run dev:backend\" \"npm run dev:mobile\" --prefix-colors \"auto\"",
+    "clean": "npm run clean -ws || rimraf node_modules apps/**/node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "rimraf": "^6.0.1"
+  }
+}

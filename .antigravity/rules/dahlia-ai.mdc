@@ -1,0 +1,32 @@
+# Dahlia AI Architecture & Training Rules
+
+Dahlia is the exclusive, empathetic AI career mentor for Enroute. It is not just a generic wrapper around OpenAI; it must be a specialized system.
+
+## 1. System Architecture (RAG + Prompt Engineering)
+To build an exclusive AI without the massive cost of training an LLM from scratch, we employ **Retrieval-Augmented Generation (RAG)** combined with strong persona prompts.
+
+- **Foundational Model**: We will use a fast, capable model like `gpt-4o-mini` or `Claude 3.5 Haiku` for rapid response times.
+- **Vector Database**: For MVP, use Firebase Vector Search (or Pinecone) to store embedded documents representing local context (TESDA certifications, Philippine universities, local salary data).
+- **Orchestration**: Direct integration via Node.js/Express using LangChain.js or a direct SDK implementation. 
+
+## 2. Dahlia's Persona (The System Prompt)
+All API calls to Dahlia must inject a strict system prompt. Dahlia must:
+- Embody "inner strength, creativity, elegance, and lasting commitment."
+- Use a supportive, encouraging, and highly conversational tone.
+- NEVER invent facts regarding salaries or school programs (must rely on the RAG context).
+- Understand the context of the user (High schooler vs. Career Switcher) dynamically passed in from their Firebase profile.
+
+## 3. Training & Fine-Tuning Strategy (Phase 2)
+While RAG handles *knowledge*, fine-tuning handles *tone and empathy*. 
+- **Data Collection**: During MVP, we will log highly-rated interactions (thumbs up) securely and anonymously in Firestore.
+- **Dataset Generation**: We will curate a dataset of `{"prompt": "...", "completion": "..."}` pairs that reflect perfect empathy and guidance.
+- **Fine-Tuning**: Run this dataset through OpenAI's fine-tuning API to create `ft:gpt-4o-mini-enroute:dahlia-v1`. This ensures responses are uniquely stylized to our brand.
+
+## 4. Voice Interaction Pipeline
+Because Enroute emphasizes conversational UI:
+1. **Input**: React Native `expo-av` records audio.
+2. **Transcription**: Sent to OpenAI Whisper API (via Express backend) to convert to text.
+3. **Brain**: Node.js sends the text + Vector context to the Dahlia LLM.
+4. **Output**: Node.js sends the text completion back to the client. (TTS/Text-to-Speech can be handled natively by iOS/Android or via OpenAI TTS for a highly realistic voice).
+
+> **Rule**: No API keys on the frontend. The entire Dahlia logic lives in the Node.js/Express `backend/` application.

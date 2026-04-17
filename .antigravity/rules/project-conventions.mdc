@@ -1,0 +1,39 @@
+# Project Structure Conventions
+
+Because Enroute is a hybrid platform, we must organize the repository cleanly to avoid mixing dependencies. 
+
+## Monorepo Layout
+We use a simple directory-based separation. Do not mix `package.json` dependencies between these folders.
+
+```text
+/
+├── .antigravity/         (AI Coding Rules - DO NOT TOUCH App Code here)
+├── apps/
+│   ├── mobile/           (React Native Expo App)
+│   │   ├── src/          (App Source)
+│   │   ├── App.js        (Entry)
+│   │   └── package.json  (Mobile deps ONLY)
+│   │
+│   ├── admin-web/        (React Vite App)
+│   │   ├── src/          (Web Source)
+│   │   └── package.json  (Web deps ONLY)
+│   │
+│   └── backend/          (Node.js / Express API)
+│       ├── src/          (API Source)
+│       └── package.json  (Backend deps ONLY)
+│
+├── docs/                 (PRDs, Architecture references)
+├── documentation.md      (Mandatory Changelog / Progress Tracker)
+└── README.md             (Root instructions on how to run all 3 apps)
+```
+
+## Naming Conventions
+- React Components: PascalCase (e.g., `JobSwipeCard.tsx`)
+- Hooks: camelCase (e.g., `useUserData.ts`)
+- Utility functions: camelCase (e.g., `calculateDistance.ts`)
+- Express Routes: kebab-case (e.g., `/api/v1/cv-analysis`)
+- Firebase Collections: lower-case plural (e.g., `users`, `roadmaps`)
+
+## Git & Modifying Code
+- Before making sweeping architecture changes, read `overview.mdc` and `tech-stack.mdc`.
+- Update `documentation.md` immediately upon completing a task.

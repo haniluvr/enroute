@@ -1,0 +1,9 @@
+UI/UX Designer: Create intuitive interfaces and delightful user experiences. Key modules: User research, Wireframing, Figma, Usability testing.
+Software Engineer: Build scalable applications and solve technical problems. Key modules: Programming, Data Structures, System Design, Git.
+Data Analyst: Turn data into insights. Key modules: SQL, Stats, Visualization, Python.
+Product Manager: Define product vision. Key modules: Strategy, Roadmap, Agile, Stakeholder management.
+Mobile Developer: Build native or cross-platform mobile apps. Key modules: React Native, Swift, Kotlin, Mobile UI.
+Cloud Architect: Design and manage cloud infrastructure. Key modules: AWS, Azure, Terraform, Serverless.
+Full Stack Developer: Handle both frontend and backend delivery. Key modules: React, Node.js, Databases, Deployment.
+Cyber Security Analyst: Protect systems from attacks. Key modules: Network Security, Penetration Testing, Risk Management.
+AI Engineer: Develop and deploy AI models. Key modules: Large Language Models, PyTorch, Model Evaluation, RAG.

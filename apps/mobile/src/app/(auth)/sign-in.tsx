@@ -1,0 +1,339 @@
+import tw from '@/lib/tailwind';
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, Animated, Dimensions } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { Link, router } from 'expo-router';
+import { supabase } from '@/config/supabase';
+import { ChevronLeft, Eye, EyeOff, X } from 'lucide-react-native';
+import { GlassBackground } from '@/components/GlassBackground';
+import { Modal } from 'react-native';
+import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
+import { useAuth } from '@/hooks/useAuth';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+export default function SignInScreen() {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [generalError, setGeneralError] = useState('');
+    const [hasLoginFailed, setHasLoginFailed] = useState(false);
+    const [displayName, setDisplayName] = useState('');
+    const [userMetadata, setUserMetadata] = useState<any>(null);
+
+    const emailRef = useRef<TextInput>(null);
+    const passwordRef = useRef<TextInput>(null);
+
+    // Animated modal values
+    const backdropOpacity = useRef(new Animated.Value(0)).current;
+    const cardTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+    const { signIn, user } = useAuth();
+
+    // Only redirect if user is already logged in AND we're not showing the success modal
+    useEffect(() => {
+        if (user && !showSuccessModal && !isLoading) {
+            router.replace('/(tabs)/home');
+        }
+    }, [user, showSuccessModal, isLoading]);
+
+    useEffect(() => {
+        if (showSuccessModal) {
+            Animated.parallel([
+                Animated.timing(backdropOpacity, {
+                    toValue: 1, duration: 280, useNativeDriver: true,
+                }),
+                Animated.spring(cardTranslateY, {
+                    toValue: 0, useNativeDriver: true, damping: 22, stiffness: 200,
+                }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(backdropOpacity, {
+                    toValue: 0, duration: 200, useNativeDriver: true,
+                }),
+                Animated.timing(cardTranslateY, {
+                    toValue: SCREEN_HEIGHT, duration: 220, useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [showSuccessModal]);
+
+    const validate = () => {
+        let isValid = true;
+        setGeneralError('');
+
+        if (!email.trim()) {
+            setEmailError('Email is required');
+            isValid = false;
+        } else if (!/\S+@\S+\.\S+/.test(email)) {
+            setEmailError('Please enter a valid email');
+            isValid = false;
+        } else {
+            setEmailError('');
+        }
+
+        if (!password) {
+            setPasswordError('Password is required');
+            isValid = false;
+        } else {
+            setPasswordError('');
+        }
+
+        return isValid;
+    };
+
+    const [loggedInUser, setLoggedInUser] = useState<any>(null);
+
+    const handleLogin = async () => {
+        if (!validate()) return;
+
+        setIsLoading(true);
+        setHasLoginFailed(false);
+        setGeneralError('');
+
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password,
+            });
+
+            if (error) {
+                if (error.message.includes('Invalid login credentials')) {
+                    setGeneralError('Invalid email or password');
+                    setHasLoginFailed(true);
+                } else if (error.message.toLowerCase().includes('email not confirmed')) {
+                    // Try to fetch profile since sign-in is blocked
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('email', email)
+                        .maybeSingle();
+
+                    const metadata = profile || {};
+                    setUserMetadata(metadata);
+                    setDisplayName(metadata.nickname || metadata.first_name || 'User');
+                    setShowSuccessModal(true);
+                    return;
+                } else {
+                    setGeneralError(error.message);
+                }
+                throw error;
+            }
+
+            if (data.user) {
+                setLoggedInUser(data.user);
+                const metadata = data.user.user_metadata || {};
+                setUserMetadata(metadata);
+                setDisplayName(metadata.nickname || metadata.first_name || 'User');
+                setShowSuccessModal(true);
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleModalClose = async () => {
+        setShowSuccessModal(false);
+        if (loggedInUser) {
+            await signIn(loggedInUser, userMetadata);
+        } else {
+            // Fallback for email-verified check or similar
+            const { data: { user } } = await supabase.auth.getUser();
+            await signIn(user || email, userMetadata);
+        }
+        router.replace('/(tabs)/home');
+    };
+
+    return (
+        <GlassBackground locations={[0.0, 0.08, 0.2, 0.55]}>
+            <SafeAreaView style={tw`flex-1 justify-between`}>
+
+                <View style={tw`px-6 pt-4`}>
+                    {/* Back Button */}
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={tw`w-10 h-10 rounded-xl bg-white/5 border border-white/10 items-center justify-center mb-8`}
+                    >
+                        <ChevronLeft color="#ffffff" size={24} />
+                    </TouchableOpacity>
+
+                    {/* Headers */}
+                    <Text style={tw`text-3xl text-white font-[InterTight] font-bold mb-3`}>
+                        Login to your account 👋
+                    </Text>
+                    <Text style={tw`text-gray-400 font-[InterTight] font-medium text-base leading-6 mb-10`}>
+                        Please fill in your details to log you back into your enroute account
+                    </Text>
+
+                    {/* Form Fields */}
+                    {generalError ? (
+                        <View style={tw`bg-red-500/10 border border-red-500/20 p-3 rounded-xl mb-6`}>
+                            <Text style={tw`text-red-400 font-[InterTight] text-sm text-center`}>{generalError}</Text>
+                        </View>
+                    ) : null}
+
+                    <View style={tw`mb-5`}>
+                        <View style={tw`flex-row justify-between items-center mb-2`}>
+                            <Text style={tw`text-white font-[InterTight] font-medium text-sm`}>Email</Text>
+                            {emailError ? <Text style={tw`text-red-400 text-xs font-[InterTight]`}>{emailError}</Text> : null}
+                        </View>
+                        <View style={tw`relative justify-center h-[54px]`}>
+                            <TextInput
+                                style={[
+                                    tw`flex-1 bg-transparent border rounded-xl pl-4 text-white font-[InterTight] text-base`,
+                                    { borderColor: emailError ? '#ef4444' : 'rgba(255,255,255,0.2)', lineHeight: undefined }
+                                ]}
+                                placeholder="Enter email address"
+                                placeholderTextColor="#666"
+                                textAlignVertical='center'
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                ref={emailRef}
+                                value={email}
+                                onChangeText={(text) => {
+                                    setEmail(text);
+                                    if (emailError) setEmailError('');
+                                }}
+                                returnKeyType="next"
+                                onSubmitEditing={() => passwordRef.current?.focus()}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={tw`mb-2`}>
+                        <View style={tw`flex-row justify-between items-center mb-2`}>
+                            <Text style={tw`text-white font-[InterTight] font-medium text-sm`}>Password</Text>
+                            {passwordError ? <Text style={tw`text-red-400 text-xs font-[InterTight]`}>{passwordError}</Text> : null}
+                        </View>
+                        <View style={tw`relative justify-center h-[54px]`}>
+                            <TextInput
+                                style={[
+                                    tw`flex-1 bg-transparent border rounded-xl pl-4 text-white font-[InterTight] text-base`,
+                                    { borderColor: passwordError ? '#ef4444' : 'rgba(255,255,255,0.2)', lineHeight: undefined }
+                                ]}
+                                placeholder="Enter password"
+                                placeholderTextColor="#666"
+                                textAlignVertical='center'
+                                secureTextEntry={!showPassword}
+                                ref={passwordRef}
+                                value={password}
+                                onChangeText={(text) => {
+                                    setPassword(text);
+                                    if (passwordError) setPasswordError('');
+                                }}
+                                returnKeyType="go"
+                                onSubmitEditing={handleLogin}
+                            />
+                            <TouchableOpacity
+                                onPress={() => setShowPassword(!showPassword)}
+                                style={tw`absolute right-4`}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                {showPassword ? (
+                                    <EyeOff color="#666" size={20} />
+                                ) : (
+                                    <Eye color="#666" size={20} />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Forgot Password */}
+                    {hasLoginFailed && (
+                        <TouchableOpacity style={tw`self-end mb-8`}>
+                            <Text style={tw`text-[#FF453A] font-[InterTight] font-medium text-sm`}>
+                                Forgot password?
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Bottom Actions */}
+                <View style={tw`px-6 pb-8`}>
+                    <TouchableOpacity
+                        onPress={handleLogin}
+                        disabled={isLoading}
+                        activeOpacity={0.85}
+                        style={tw`w-full bg-white py-4 rounded-full items-center justify-center mb-6`}
+                    >
+                        <Text style={tw`text-black text-lg font-[InterTight] font-semibold`}>
+                            {isLoading ? 'Logging in...' : 'Login'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={tw`flex-row justify-center`}>
+                        <Text style={tw`text-gray-400 font-[InterTight] font-medium text-base`}>
+                            Don't have an account?{' '}
+                        </Text>
+                        <Link href="/(auth)/sign-up" asChild>
+                            <TouchableOpacity>
+                                <Text style={tw`text-white font-[InterTight] font-bold text-base`}>
+                                    Signup
+                                </Text>
+                            </TouchableOpacity>
+                        </Link>
+                    </View>
+                </View>
+
+            </SafeAreaView>
+
+            {/* Success Modal */}
+            <Modal
+                transparent
+                visible={showSuccessModal}
+                animationType="none"
+                onRequestClose={handleModalClose}
+                statusBarTranslucent
+            >
+                <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                    {/* Dissolving blurred backdrop */}
+                    <Animated.View style={[StyleSheet.absoluteFill, { opacity: backdropOpacity }]}>
+                        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                    </Animated.View>
+
+                    {/* Sliding card */}
+                    <Animated.View
+                        style={[
+                            tw`absolute bottom-0 left-0 right-0 px-4 pb-4`,
+                            { transform: [{ translateY: cardTranslateY }] },
+                        ]}
+                    >
+                        <View style={tw`w-full bg-[#1C1C1E] rounded-3xl p-6 pt-10 border border-white/10 items-center shadow-2xl`}>
+                            {/* Close Button */}
+                            <TouchableOpacity
+                                onPress={handleModalClose}
+                                style={tw`absolute top-4 right-4 w-9 h-9 bg-white/10 rounded-xl items-center justify-center z-10`}
+                            >
+                                <X color="#999" size={20} />
+                            </TouchableOpacity>
+
+                            {/* Title and Text */}
+                            <Text style={tw`text-3xl text-white font-[InterTight] font-medium mt-8 mb-2 text-center`}>
+                                Welcome, {displayName || 'User'}!
+                            </Text>
+                            <Text style={tw`text-gray-400 font-[InterTight] text-lg text-center leading-5 mb-4 px-2`}>
+                                Ask questions, get career roadmaps,{'\n'}and explore resources
+                            </Text>
+
+                            {/* Lottie Animation */}
+                            <LottieView
+                                source={require('@/assets/success.json')}
+                                autoPlay
+                                loop={false}
+                                style={tw`w-30 h-30`}
+                            />
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
+
+        </GlassBackground>
+    );
+}

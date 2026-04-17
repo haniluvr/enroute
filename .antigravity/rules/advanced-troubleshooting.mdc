@@ -1,0 +1,21 @@
+# Advanced Troubleshooting & Common Vibe-Coding Pitfalls
+
+When using AI agents to vibe-code a multi-tier architecture (Expo Mobile + Vite Web + Express Backend + Firebase), be aware of these common issues:
+
+## 1. Firebase Admin vs Client SDK Mixing
+- **Bug**: Agent tries to use `firebase-admin` in the React Native or Vite app, causing immediate crashes (requires Node.js core modules).
+- **Fix**: STRICTLY use `firebase/app` and `firebase/firestore` on the client. Reserve `firebase-admin` entirely for the Express server.
+
+## 2. React Native Expo Build Errors
+- **Bug**: Installing a raw native module (e.g., specific heavy voice processing libs) that Expo Go doesn't support.
+- **Fix**: Stick to `expo-av` and officially supported Expo modules. If a custom native library is needed, you MUST switch from Expo Go to a Development Build (`npx expo run:ios`). Mention this to the user before doing it.
+
+## 3. CORS on Express API
+- **Bug**: Admin Web App tries to hit the Express API and fails due to CORS.
+- **Fix**: The Express server must use the `cors` middleware, configured to accept requests from localhost (during dev) and the deployed web domains.
+
+## 4. UI Rendering Glitches in Tailwind / NativeWind
+- **Bug**: Class names aren't applying in React Native.
+- **Fix**: NativeWind translates classes at compile time. Ensure `tailwind.config.js` is correctly pointing to all `.js/.jsx/.ts/.tsx` files. Avoid complex CSS string concatenations that Babel can't parse statically.
+
+If stuck, consult `possible-solutions.mdc`.
